@@ -108,6 +108,55 @@ streamlit run app.py --server.port 8510
 
 ---
 
+## ネット公開（Streamlit Community Cloud・社内向け）
+
+パスワード付きで URL 公開できます。**顧客の個人情報があるため、必ずパスワードを設定**し、URL は社員だけに共有してください。
+
+### 事前準備
+
+1. コードを **GitHub のプライベートリポジトリ** に置く（Streamlit Cloud は GitHub 連携）
+2. [share.streamlit.io](https://share.streamlit.io/) に GitHub でログイン
+3. **New app** → リポジトリを選択
+   - Main file path: `sanrin_mail_kit/app.py`
+   - Python version: 3.11 推奨
+
+### Secrets の設定（必須）
+
+Streamlit Cloud のアプリ設定 → **Secrets** に、次を貼ります。
+
+1. `app_password = "社員だけが知るパスワード"`
+2. `[gcp_service_account]` 以下に、ローカルの `data/google_service_account.json` の内容を TOML 形式で記載  
+   （ひな形: `.streamlit/secrets.toml.example`）
+
+ローカルで TOML を自動生成する例:
+
+```bash
+cd sanrin_mail_kit
+python3 - <<'PY'
+import json
+from pathlib import Path
+sa = json.loads(Path("data/google_service_account.json").read_text())
+print('app_password = "変更してください"')
+print()
+print("[gcp_service_account]")
+for k, v in sa.items():
+    if isinstance(v, str):
+        print(f'{k} = {json.dumps(v)}')
+    else:
+        print(f"{k} = {v}")
+PY
+```
+
+出力をコピーして Streamlit Cloud の Secrets に貼ってください（チャットや公開場所には貼らない）。
+
+### デプロイ後
+
+- 表示された `https://xxxx.streamlit.app` を社内に共有
+- 初回アクセスでパスワード入力
+- シート共有はこれまでどおりサービスアカウントのまま
+
+---
+
 ## 使い方の概要
 
 ### ① スプレッドシートから選択（推奨）

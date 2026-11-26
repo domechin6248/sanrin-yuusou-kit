@@ -261,11 +261,48 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+
+def _app_password() -> str | None:
+    """Secrets に app_password があれば返す（クラウド用）。"""
+    try:
+        return str(st.secrets["app_password"])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def require_login() -> bool:
+    """
+    app_password が設定されているときだけログインを要求する。
+    ローカルで Secrets 未設定ならスキップ（開発用）。
+    """
+    expected = _app_password()
+    if not expected:
+        return True
+    if st.session_state.get("sanrin_mail_kit_authenticated"):
+        return True
+
+    st.title("🌲 山林パートナーズ　郵送キット")
+    st.caption("社内利用のためパスワードが必要です")
+    with st.form("sanrin_mail_kit_login"):
+        pw = st.text_input("パスワード", type="password")
+        submitted = st.form_submit_button("ログイン", type="primary")
+    if submitted:
+        if pw == expected:
+            st.session_state["sanrin_mail_kit_authenticated"] = True
+            st.rerun()
+        st.error("パスワードが違います")
+    return False
+
+
+if not require_login():
+    st.stop()
+
 st.title("🌲 山林パートナーズ　郵送キット自動生成")
 st.caption(
     "合同会社山林パートナーズ｜不要山林の有料引き取り事業｜"
     "同封書類・宛名ラベル PDF 生成（独立アプリ / ポート 8510 推奨）｜長3封筒対応"
 )
+
 
 # --- サイドバー：自社情報・フォント・印刷設定 ---
 with st.sidebar:

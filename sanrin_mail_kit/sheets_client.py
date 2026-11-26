@@ -2,12 +2,16 @@
 合同会社山林パートナーズ — Google スプレッドシート連携
 
 サービスアカウント認証のみを使用する（公開リンクは使わない）。
-認証ファイル: data/google_service_account.json
+認証の優先順位:
+  1. Streamlit secrets の gcp_service_account（クラウド向け）
+  2. 環境変数 GOOGLE_SERVICE_ACCOUNT_JSON
+  3. data/google_service_account.json（ローカル向け）
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -18,6 +22,11 @@ import pandas as pd
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 CONFIG_PATH = DATA_DIR / "sheets_config.json"
+
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.readonly",
+]
 
 
 class SheetsConfigError(Exception):
@@ -37,6 +46,51 @@ def credentials_path(config: dict[str, Any] | None = None) -> Path:
     return DATA_DIR / name
 
 
+def _sa_info_from_secrets() -> dict[str, Any] | None:
+    """Streamlit secrets からサービスアカウント情報を取得。"""
+    try:
+        import streamlit as st
+    except ImportError:
+        return None
+    try:
+        if "gcp_service_account" in st.secrets:
+            return dict(st.secrets["gcp_service_account"])
+    except Exception:  # noqa: BLE001
+        return None
+    return None
+
+
+def _sa_info_from_env() -> dict[str, Any] | None:
+    raw = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise SheetsConfigError(
+            "環境変数 GOOGLE_SERVICE_ACCOUNT_JSON が不正な JSON です"
+        ) from exc
+
+
+def load_service_account_info() -> dict[str, Any]:
+    """サービスアカウント JSON 相当の dict を返す。"""
+    info = _sa_info_from_secrets()
+    if info:
+        return info
+    info = _sa_info_from_env()
+    if info:
+        return info
+    path = credentials_path()
+    if path.exists():
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    raise SheetsConfigError(
+        "認証情報がありません。\n"
+        "・クラウド: Streamlit Secrets に gcp_service_account を設定\n"
+        "・ローカル: data/google_service_account.json を配置"
+    )
+
+
 def get_connection_status() -> dict[str, str]:
     """UI 表示用の接続状態。"""
     try:
@@ -44,26 +98,20 @@ def get_connection_status() -> dict[str, str]:
     except SheetsConfigError as exc:
         return {"status": "error", "message": str(exc)}
 
-    cred = credentials_path(cfg)
-    if not cred.exists():
-        return {
-            "status": "missing_credentials",
-            "message": (
-                f"認証ファイルがありません: {cred.name}\n"
-                "Google Cloud のサービスアカウント JSON を data/ に配置し、"
-                "スプレッドシートをそのメールに「編集者」共有してください。"
-            ),
-        }
     try:
-        with open(cred, encoding="utf-8") as f:
-            info = json.load(f)
+        info = load_service_account_info()
         email = info.get("client_email", "(不明)")
+        source = "Secrets/環境変数" if (
+            _sa_info_from_secrets() or os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+        ) else "ローカルファイル"
+    except SheetsConfigError as exc:
+        return {"status": "missing_credentials", "message": str(exc)}
     except (json.JSONDecodeError, OSError) as exc:
-        return {"status": "error", "message": f"認証ファイルを読めません: {exc}"}
+        return {"status": "error", "message": f"認証情報を読めません: {exc}"}
 
     return {
         "status": "ready",
-        "message": f"認証ファイルあり（{email}）",
+        "message": f"認証 OK（{email} / {source}）",
         "service_account_email": email,
         "spreadsheet_id": cfg.get("spreadsheet_id", ""),
     }
@@ -79,15 +127,8 @@ def _authorize(config: dict[str, Any]):
             " pip install -r requirements.txt を実行してください。"
         ) from exc
 
-    cred = credentials_path(config)
-    if not cred.exists():
-        raise SheetsConfigError(f"認証ファイルがありません: {cred}")
-
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive.readonly",
-    ]
-    credentials = Credentials.from_service_account_file(str(cred), scopes=scopes)
+    info = load_service_account_info()
+    credentials = Credentials.from_service_account_info(info, scopes=SCOPES)
     return gspread.authorize(credentials)
 
 

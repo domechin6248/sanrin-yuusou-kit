@@ -3,7 +3,7 @@
 **/__pycache__/
 **/*.pyc
 .DS_Store
-.streamlit/secrets.toml
+**/.streamlit/secrets.toml
 
 # Secrets — never commit
 **/google_service_account.json
