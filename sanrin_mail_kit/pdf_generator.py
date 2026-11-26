@@ -586,7 +586,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     c.drawString(margin, y, "■　自由記入欄・ご質問欄")
     y -= 10
 
-    free_h = 72
+    free_h = 52
     c.setStrokeColor(DARK)
     c.setLineWidth(1.1)
     c.setFillColor(colors.white)
@@ -594,25 +594,52 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
 
     c.setStrokeColor(LIGHT_GRAY)
     c.setDash(2, 3)
-    line_y = y - 22
-    while line_y > y - free_h + 10:
+    line_y = y - 24
+    while line_y > y - free_h + 8:
         c.line(margin + 4, line_y, PAGE_W - margin - 4, line_y)
-        line_y -= 20
+        line_y -= 22
     c.setDash()
 
-    # 下部：ご連絡先（手書き）
-    y = y - free_h - 28
+    # 下部：ご連絡先（高齢者でも書きやすい高めの記入枠）
+    y = y - free_h - 24
     c.setFont(body, 15)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　ご連絡先（ご記入ください）")
-    y -= 30
+    y -= 18
 
-    c.setFont(body, 14)
-    c.drawString(margin, y, "お名前：________________________________　様")
-    y -= 28
-    c.drawString(margin, y, "ご住所：________________________________________________")
-    y -= 28
-    c.drawString(margin, y, "お電話番号：____________________")
+    field_h = 36
+    field_gap = 12
+    label_w = 78
+    fields = [
+        ("お名前", True),
+        ("ご住所", False),
+        ("お電話番号", False),
+    ]
+    for label, with_sama in fields:
+        box_top = y
+        box_bottom = y - field_h
+        c.setStrokeColor(DARK)
+        c.setLineWidth(1.2)
+        c.setFillColor(colors.white)
+        c.roundRect(margin, box_bottom, PAGE_W - 2 * margin, field_h, 2, stroke=1, fill=1)
+
+        c.setFont(body, 13)
+        c.setFillColor(DARK)
+        c.drawString(margin + 10, box_bottom + field_h / 2 - 4, f"{label}")
+
+        # 記入ライン
+        line_left = margin + label_w
+        line_right = PAGE_W - margin - (28 if with_sama else 10)
+        c.setStrokeColor(LIGHT_GRAY)
+        c.setLineWidth(1)
+        c.line(line_left, box_bottom + 10, line_right, box_bottom + 10)
+
+        if with_sama:
+            c.setFont(body, 14)
+            c.setFillColor(DARK)
+            c.drawString(line_right + 4, box_bottom + field_h / 2 - 4, "様")
+
+        y = box_bottom - field_gap
 
     c.setFont(body, 11)
     c.setFillColor(GRAY)
