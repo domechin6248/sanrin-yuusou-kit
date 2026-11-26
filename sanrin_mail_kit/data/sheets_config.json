@@ -7,6 +7,7 @@
     "management_no": "お客様番号",
     "reception_datetime": "受付日時",
     "name": "発信者のお名前",
+    "name_kana": "お名前（カタカナ）",
     "phone": "お電話番号",
     "postal_code": "郵便番号",
     "address": "住所",

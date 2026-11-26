@@ -182,10 +182,17 @@ def _row_to_customer(row: dict[str, Any], columns: dict[str, str]) -> dict[str, 
         extra = f"山林の名義: {forest_owner}"
         notes = f"{notes} / {extra}" if notes else extra
 
+    name = col("name")
+    name_kana = col("name_kana")
+    # 宛名ラベルはカタカナ優先（初回郵送用）。未入力時は漢字名を使う。
+    label_name = name_kana or name
+
     return {
         "management_no": col("management_no"),
         "reception_date": _parse_reception_date(col("reception_datetime")),
-        "name": col("name"),
+        "name": label_name,
+        "name_kanji": name,
+        "name_kana": name_kana,
         "honorific": "様",
         "phone": col("phone"),
         "postal_code": col("postal_code"),
@@ -234,6 +241,8 @@ def fetch_customers(
                 "management_no",
                 "reception_date",
                 "name",
+                "name_kanji",
+                "name_kana",
                 "honorific",
                 "phone",
                 "postal_code",

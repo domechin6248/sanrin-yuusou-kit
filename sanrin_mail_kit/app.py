@@ -444,6 +444,8 @@ with tab_sheets:
 
         display_cols = [
             "management_no",
+            "name_kanji",
+            "name_kana",
             "name",
             "postal_code",
             "address",
