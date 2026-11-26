@@ -534,7 +534,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     guide_leading = 17
     guide_lines = _wrap_text(guide, body, 12, content_w)
 
-    mark_w = 26
+    mark_w = 32
     note_w = 78
     header_h = 18
     row_h = 22
@@ -553,7 +553,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     table_top = label_y - 16 - gap_label_to_table
     box_bottom = table_top - table_h - pad_bottom
     box_h = box_top - box_bottom
-    note_y = box_bottom - 18
+    note_y = box_bottom - 28
 
     c.setStrokeColor(DARK)
     c.setLineWidth(1.1)
@@ -610,11 +610,11 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
             c.drawCentredString(cx + col_w[i] / 2, ry + 6, cell)
             cx += col_w[i]
 
-    mark_cx = table_x - mark_w / 2
+    mark_cx = table_x - mark_w / 2 - 2
     mark_cy = table_top - header_h - row_h / 2
     c.setStrokeColor(RED)
-    c.setLineWidth(2.2)
-    c.circle(mark_cx, mark_cy, 10, stroke=1, fill=0)
+    c.setLineWidth(2.0)
+    c.circle(mark_cx, mark_cy, 9, stroke=1, fill=0)
     c.setFont(body, 10)
     c.setFillColor(RED)
     c.drawString(table_x + table_w + 6, mark_cy - 3, "← 引き取り希望")
@@ -627,7 +627,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         "※ 上の例のように、引き取りを希望する土地の所在地の左側（または地番）に丸をつけてください。",
     )
 
-    y = note_y - 24
+    y = note_y - 26
 
     c.setFont(body, 15)
     c.setFillColor(DARK)
