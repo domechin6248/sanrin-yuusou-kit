@@ -427,7 +427,7 @@ def _draw_cover_letter_common(
 
     y -= 20
     tip = (
-        "【ひとこと】　「どの土地・物件を弊社に引き取ってほしいか」が分かる書類のコピーが必要です。"
+        "【ひとこと】　「どの山や土地のお引き取りを希望されるか」が分かる書類のコピーが必要です。"
         "市区町村から届く固定資産税の書類や、市役所・町村役場で取得できる証明書などです。"
         "お手元の書類の名前が違っても構いません。どれか1種類で大丈夫です。"
     )
@@ -556,7 +556,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     content_w = PAGE_W - 2 * margin - 20
     guide = (
         "同封いただく固定資産の書類（課税明細書・名寄せ帳・公課証明書など）のコピーの中で、"
-        "引き取りをご希望される土地・物件の行（所在地の左側または地番）に赤ペン等で丸（〇）をつけてください。"
+        "お引き取りを希望される山や土地の行（所在地の左側または地番）に赤ペン等で丸（〇）をつけてください。"
     )
     guide_leading = 17
     guide_lines = _wrap_text(guide, body, 12, content_w)
@@ -651,7 +651,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     c.drawString(
         content_x,
         note_y,
-        "※ 上の例のように、引き取りを希望する土地の所在地の左側（または地番）に丸をつけてください。",
+        "※ 上の例のように、お引き取りを希望される山や土地の所在地の左側（または地番）に丸をつけてください。",
     )
 
     y = note_y - 26
