@@ -507,10 +507,11 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
 
     y -= 44
     c.setFont(body, 14)
-    c.drawString(margin, y, "お客様氏名：____________________________　様")
-    c.drawRightString(PAGE_W - margin, y, "管理番号：________________")
+    c.drawString(margin, y, "お客様氏名：________________________________　様")
+    y -= 26
+    c.drawString(margin, y, "管理番号：____________________")
 
-    y -= 34
+    y -= 32
     c.setFont(body, 15)
     c.drawString(margin, y, "■　対象となる土地・物件の指定")
     y -= 8
