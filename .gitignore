@@ -1,0 +1,17 @@
+# Python / Streamlit
+**/.venv/
+**/__pycache__/
+**/*.pyc
+.DS_Store
+.streamlit/secrets.toml
+
+# Secrets — never commit
+**/google_service_account.json
+**/.env
+**/.env.*
+
+# Runtime / generated
+sanrin_mail_kit/output/*.pdf
+sanrin_mail_kit/output/preview_images/
+sanrin_mail_kit/data/history.csv
+sanrin_mail_kit/data/management_counter.json

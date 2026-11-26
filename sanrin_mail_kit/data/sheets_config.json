@@ -1,0 +1,19 @@
+{
+  "spreadsheet_id": "1JpWsr7SoP7Tiq2ftsIgVlhP0RoddgaQgRsRgHN9iIh4",
+  "worksheet_gid": 0,
+  "credentials_file": "google_service_account.json",
+  "status_after_kit": "郵送キット作成済",
+  "columns": {
+    "management_no": "お客様番号",
+    "reception_datetime": "受付日時",
+    "name": "発信者のお名前",
+    "phone": "お電話番号",
+    "postal_code": "郵便番号",
+    "address": "住所",
+    "address_detail": "番地・建物名・部屋番号",
+    "notes": "備考・特記事項",
+    "status": "対応状況",
+    "route": "案内ルート",
+    "forest_owner": "山林の名義"
+  }
+}

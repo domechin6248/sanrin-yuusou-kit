@@ -1,0 +1,1050 @@
+"""
+合同会社山林パートナーズ — 郵送キット PDF 生成モジュール
+同封書類（送付状・ヒアリングシート）および宛名ラベルを生成する。
+"""
+
+from __future__ import annotations
+
+import os
+import platform
+from io import BytesIO
+from pathlib import Path
+from typing import Any
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
+
+# ---------------------------------------------------------------------------
+# パス・定数
+# ---------------------------------------------------------------------------
+BASE_DIR = Path(__file__).resolve().parent
+FONTS_DIR = BASE_DIR / "fonts"
+
+PAGE_W, PAGE_H = A4  # 210mm × 297mm
+
+FONT_REGULAR = "SanrinJP"
+FONT_BOLD = "SanrinJP-Bold"
+
+RED = colors.Color(0.75, 0.05, 0.05)
+DARK = colors.Color(0.15, 0.15, 0.15)
+GRAY = colors.Color(0.45, 0.45, 0.45)
+LIGHT_GRAY = colors.Color(0.85, 0.85, 0.85)
+
+
+# ---------------------------------------------------------------------------
+# 日本語フォント検出・登録
+# ---------------------------------------------------------------------------
+def _candidate_font_paths() -> list[tuple[Path, Path | None]]:
+    """(regular, bold|None) の候補リストを返す。"""
+    candidates: list[tuple[Path, Path | None]] = []
+
+    # 1) アプリ同梱 fonts/
+    local_regular = [
+        FONTS_DIR / "NotoSansJP-Regular.ttf",
+        FONTS_DIR / "NotoSansJP-Bold.ttf",
+        FONTS_DIR / "NotoSansCJKjp-Regular.otf",
+        FONTS_DIR / "ipaexg.ttf",
+        FONTS_DIR / "IPAexGothic.ttf",
+        FONTS_DIR / "GenShinGothic-Regular.ttf",
+        FONTS_DIR / "SourceHanSans-Regular.otf",
+    ]
+    local_bold = [
+        FONTS_DIR / "NotoSansJP-Bold.ttf",
+        FONTS_DIR / "NotoSansJP-Regular.ttf",  # 可変フォント1本の場合のフォールバック
+        FONTS_DIR / "NotoSansCJKjp-Bold.otf",
+        FONTS_DIR / "ipaexg.ttf",
+        FONTS_DIR / "IPAexGothic.ttf",
+        FONTS_DIR / "GenShinGothic-Bold.ttf",
+        FONTS_DIR / "SourceHanSans-Bold.otf",
+    ]
+    for reg in local_regular:
+        if reg.exists():
+            bold = next((b for b in local_bold if b.exists()), reg)
+            candidates.append((reg, bold))
+
+    system = platform.system()
+    if system == "Darwin":
+        mac_fonts = [
+            (
+                Path("/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc"),
+                Path("/System/Library/Fonts/ヒラギノ角ゴシック W6.ttc"),
+            ),
+            (
+                Path("/System/Library/Fonts/Hiragino Sans GB.ttc"),
+                Path("/System/Library/Fonts/Hiragino Sans GB.ttc"),
+            ),
+            (
+                Path("/Library/Fonts/Arial Unicode.ttf"),
+                Path("/Library/Fonts/Arial Unicode.ttf"),
+            ),
+            (
+                Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
+                Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
+            ),
+        ]
+        # AppleGothic / Osaka 等
+        for name in ("AppleGothic.ttf", "Osaka.ttf"):
+            p = Path("/System/Library/Fonts") / name
+            if p.exists():
+                mac_fonts.append((p, p))
+            p2 = Path("/Library/Fonts") / name
+            if p2.exists():
+                mac_fonts.append((p2, p2))
+        candidates.extend(mac_fonts)
+
+    elif system == "Windows":
+        windir = Path(os.environ.get("WINDIR", r"C:\Windows"))
+        fonts = windir / "Fonts"
+        win_fonts = [
+            (fonts / "msgothic.ttc", fonts / "msgothic.ttc"),
+            (fonts / "meiryo.ttc", fonts / "meiryo.ttc"),
+            (fonts / "YuGothM.ttc", fonts / "YuGothB.ttc"),
+            (fonts / "YuGothR.ttc", fonts / "YuGothB.ttc"),
+            (fonts / "msmincho.ttc", fonts / "msmincho.ttc"),
+        ]
+        candidates.extend(win_fonts)
+
+    else:
+        # Linux 等
+        linux_fonts = [
+            (
+                Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+                Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"),
+            ),
+            (
+                Path("/usr/share/fonts/truetype/fonts-japanese-gothic.ttf"),
+                Path("/usr/share/fonts/truetype/fonts-japanese-gothic.ttf"),
+            ),
+            (
+                Path("/usr/share/fonts/truetype/noto/NotoSansCJKjp-Regular.otf"),
+                Path("/usr/share/fonts/truetype/noto/NotoSansCJKjp-Bold.otf"),
+            ),
+        ]
+        candidates.extend(linux_fonts)
+
+    return candidates
+
+
+_fonts_registered = False
+_font_info: dict[str, str] = {"regular": "", "bold": "", "status": "未登録"}
+
+
+def get_font_status() -> dict[str, str]:
+    """現在登録されているフォント情報を返す。"""
+    ensure_fonts()
+    return dict(_font_info)
+
+
+def ensure_fonts() -> None:
+    """日本語フォントを検出し、ReportLab に登録する。"""
+    global _fonts_registered, _font_info
+    if _fonts_registered:
+        return
+
+    for regular, bold in _candidate_font_paths():
+        if not regular.exists():
+            continue
+        try:
+            # TTC は subfontIndex=0 で試行
+            if regular.suffix.lower() == ".ttc":
+                pdfmetrics.registerFont(
+                    TTFont(FONT_REGULAR, str(regular), subfontIndex=0)
+                )
+            else:
+                pdfmetrics.registerFont(TTFont(FONT_REGULAR, str(regular)))
+
+            bold_path = bold if bold and bold.exists() else regular
+            bold_name = FONT_BOLD
+            try:
+                if bold_path.suffix.lower() == ".ttc":
+                    pdfmetrics.registerFont(
+                        TTFont(bold_name, str(bold_path), subfontIndex=0)
+                    )
+                else:
+                    pdfmetrics.registerFont(TTFont(bold_name, str(bold_path)))
+            except Exception:
+                # 太字が失敗したら通常フォントを太字名でも登録
+                if bold_path.suffix.lower() == ".ttc":
+                    pdfmetrics.registerFont(
+                        TTFont(bold_name, str(regular), subfontIndex=0)
+                    )
+                else:
+                    pdfmetrics.registerFont(TTFont(bold_name, str(regular)))
+
+            _font_info = {
+                "regular": str(regular),
+                "bold": str(bold_path),
+                "status": "OK",
+            }
+            _fonts_registered = True
+            return
+        except Exception as exc:  # noqa: BLE001
+            _font_info = {
+                "regular": str(regular),
+                "bold": "",
+                "status": f"失敗: {exc}",
+            }
+            continue
+
+    # フォールバック: Helvetica（日本語は化けるがクラッシュ防止）
+    _font_info = {
+        "regular": "(Helvetica — 日本語非対応)",
+        "bold": "(Helvetica-Bold)",
+        "status": "日本語フォント未検出。./fonts/ に NotoSansJP-Regular.ttf 等を配置してください。",
+    }
+    # 名前だけ登録しておかないと描画時にエラーになるため、標準フォント名をエイリアス化はできない。
+    # 呼び出し側で FONT_REGULAR が未登録なら Helvetica を使う。
+    _fonts_registered = True
+
+
+def _font(bold: bool = False) -> str:
+    ensure_fonts()
+    name = FONT_BOLD if bold else FONT_REGULAR
+    if name in pdfmetrics.getRegisteredFontNames():
+        return name
+    return "Helvetica-Bold" if bold else "Helvetica"
+
+
+# ---------------------------------------------------------------------------
+# 描画ヘルパー
+# ---------------------------------------------------------------------------
+def _draw_wrapped_text(
+    c: canvas.Canvas,
+    text: str,
+    x: float,
+    y: float,
+    max_width: float,
+    font_name: str,
+    font_size: float,
+    leading: float | None = None,
+    color: Any = DARK,
+    align: str = "left",
+) -> float:
+    """テキストを折り返して描画し、最終 Y 座標を返す。"""
+    leading = leading or font_size * 1.4
+    c.setFont(font_name, font_size)
+    c.setFillColor(color)
+    lines = _wrap_text(text, font_name, font_size, max_width)
+    for i, line in enumerate(lines):
+        yy = y - i * leading
+        if align == "center":
+            c.drawCentredString(x + max_width / 2, yy, line)
+        elif align == "right":
+            c.drawRightString(x + max_width, yy, line)
+        else:
+            c.drawString(x, yy, line)
+    return y - (len(lines) - 1) * leading if lines else y
+
+
+def _wrap_text(text: str, font_name: str, font_size: float, max_width: float) -> list[str]:
+    if not text:
+        return [""]
+    # 改行を尊重
+    paragraphs = text.replace("\r\n", "\n").split("\n")
+    result: list[str] = []
+    for para in paragraphs:
+        if not para:
+            result.append("")
+            continue
+        current = ""
+        for ch in para:
+            trial = current + ch
+            if pdfmetrics.stringWidth(trial, font_name, font_size) <= max_width:
+                current = trial
+            else:
+                if current:
+                    result.append(current)
+                current = ch
+        if current:
+            result.append(current)
+    return result or [""]
+
+
+def _fit_font_size(
+    text: str,
+    font_name: str,
+    max_width: float,
+    max_size: float,
+    min_size: float = 7.0,
+) -> float:
+    size = max_size
+    while size > min_size:
+        if pdfmetrics.stringWidth(text, font_name, size) <= max_width:
+            return size
+        size -= 0.5
+    return min_size
+
+
+def _draw_checkbox_line(
+    c: canvas.Canvas,
+    x: float,
+    y: float,
+    label: str,
+    font_size: float = 11,
+    box_size: float = 12,
+    max_width: float | None = None,
+) -> float:
+    """大きなチェックボックス付き行を描画。戻り値は次の Y。"""
+    c.setStrokeColor(DARK)
+    c.setLineWidth(1.2)
+    c.rect(x, y - 2, box_size, box_size, stroke=1, fill=0)
+    # 空のチェック記号風
+    c.setFont(_font(), font_size * 0.7)
+    c.setFillColor(GRAY)
+    # ラベル
+    text_x = x + box_size + 6
+    width = (max_width or (PAGE_W - text_x - 20 * mm))
+    final_y = _draw_wrapped_text(
+        c, label, text_x, y + 1, width, _font(), font_size, leading=font_size * 1.45
+    )
+    lines = _wrap_text(label, _font(), font_size, width)
+    return min(final_y, y) - font_size * 1.45 * max(0, len(lines) - 1) - 10
+
+
+def _draw_emphasized(
+    c: canvas.Canvas,
+    text: str,
+    x: float,
+    y: float,
+    max_width: float,
+    font_size: float = 10,
+) -> float:
+    """赤字・太字の強調テキスト。"""
+    return _draw_wrapped_text(
+        c, text, x, y, max_width, _font(True), font_size, color=RED
+    )
+
+
+# ---------------------------------------------------------------------------
+# 同封書類 PDF（送付状 + ヒアリングシート）
+# ---------------------------------------------------------------------------
+def generate_documents_pdf(customer: dict, company: dict) -> bytes:
+    """送付状兼お手続きガイド + 簡易ヒアリングシート の 2 ページ PDF。"""
+    ensure_fonts()
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    _draw_cover_letter(c, customer, company)
+    c.showPage()
+    _draw_hearing_sheet(c, customer, company)
+    c.save()
+    return buf.getvalue()
+
+
+def _draw_cover_letter(c: canvas.Canvas, customer: dict, company: dict) -> None:
+    margin = 18 * mm
+    y = PAGE_H - 18 * mm
+
+    # ヘッダー：自社情報（右寄せ）
+    c.setFont(_font(True), 10)
+    c.setFillColor(DARK)
+    c.drawRightString(PAGE_W - margin, y, company.get("company_name", ""))
+    y -= 14
+    c.setFont(_font(), 9)
+    c.drawRightString(
+        PAGE_W - margin,
+        y,
+        f"〒{company.get('postal_code', '')}  {company.get('address', '')}",
+    )
+    y -= 12
+    phone = company.get("phone", "")
+    dept = company.get("department", "")
+    contact = company.get("contact_person", "")
+    right_line = "  /  ".join(filter(None, [dept, f"TEL {phone}" if phone else "", contact]))
+    if right_line:
+        c.drawRightString(PAGE_W - margin, y, right_line)
+
+    # 区切り線
+    y -= 10
+    c.setStrokeColor(DARK)
+    c.setLineWidth(1.5)
+    c.line(margin, y, PAGE_W - margin, y)
+
+    # 日付・管理番号
+    y -= 22
+    c.setFont(_font(), 11)
+    c.setFillColor(DARK)
+    date_str = customer.get("reception_date", "")
+    mgmt = customer.get("management_no", "")
+    c.drawString(margin, y, f"日付：{date_str}")
+    if mgmt:
+        c.drawRightString(PAGE_W - margin, y, f"管理番号：{mgmt}")
+
+    # 宛名
+    y -= 28
+    c.setFont(_font(), 11)
+    postal = customer.get("postal_code", "")
+    if postal:
+        c.setFont(_font(True), 12)
+        c.drawString(margin, y, f"〒 {postal}")
+        y -= 16
+    addr = customer.get("address", "")
+    if addr:
+        y = _draw_wrapped_text(
+            c, addr, margin, y, PAGE_W - 2 * margin - 40 * mm, _font(), 11
+        )
+        y -= 16
+    name = customer.get("name", "")
+    honorific = customer.get("honorific", "様")
+    c.setFont(_font(True), 16)
+    c.setFillColor(DARK)
+    c.drawString(margin, y, f"{name}　{honorific}")
+
+    # タイトル
+    y -= 36
+    c.setStrokeColor(DARK)
+    c.setFillColor(colors.Color(0.95, 0.95, 0.93))
+    title_h = 28
+    c.roundRect(margin, y - 6, PAGE_W - 2 * margin, title_h, 3, stroke=1, fill=1)
+    c.setFont(_font(True), 15)
+    c.setFillColor(DARK)
+    c.drawCentredString(PAGE_W / 2, y + 2, "山林引き取りご相談　郵送お手続きのご案内")
+
+    # 導入文
+    y -= 30
+    intro = (
+        "このたびは山林の引き取りについてお問い合わせいただき、誠にありがとうございます。"
+        "ご高齢のお客様やパソコン操作がご不安なお客様にも安心してご利用いただけるよう、"
+        "必要書類を郵送でお送りいただくためのキットをお届けしました。"
+        "下記をご確認のうえ、同封の返信用封筒でご返送ください。"
+    )
+    y = _draw_wrapped_text(
+        c, intro, margin, y, PAGE_W - 2 * margin, _font(), 10.5, leading=15
+    )
+
+    # ご返送いただきたいもの
+    y -= 28
+    c.setFont(_font(True), 13)
+    c.setFillColor(DARK)
+    c.drawString(margin, y, "■　ご返送いただきたいもの")
+    y -= 8
+    c.setStrokeColor(DARK)
+    c.setLineWidth(0.8)
+    c.line(margin, y, PAGE_W - margin, y)
+
+    y -= 22
+    items = [
+        (
+            "固定資産税の納税通知書・課税明細書のコピー",
+            "※ 原本ではなく必ずコピーをお送りください",
+        ),
+        (
+            "ご本人様確認書類のコピー（運転免許証の両面、またはマイナンバーカードの表面のみ）",
+            "※ マイナンバーカードの裏面は絶対にコピーしないでください",
+        ),
+        (
+            "同封の「山林引き取り　簡易ヒアリングシート」（ご記入のうえ）",
+            None,
+        ),
+    ]
+    content_w = PAGE_W - 2 * margin - 20
+    for label, emphasis in items:
+        # チェックボックス
+        box = 14
+        c.setStrokeColor(DARK)
+        c.setLineWidth(1.3)
+        c.setFillColor(colors.white)
+        c.rect(margin, y - 3, box, box, stroke=1, fill=1)
+
+        text_x = margin + box + 8
+        y = _draw_wrapped_text(
+            c, label, text_x, y + 2, content_w - box, _font(), 11, leading=15
+        )
+        if emphasis:
+            y -= 14
+            y = _draw_emphasized(c, emphasis, text_x, y, content_w - box, font_size=10.5)
+        y -= 20
+
+    # 今後の流れ
+    y -= 8
+    c.setFont(_font(True), 13)
+    c.setFillColor(DARK)
+    c.drawString(margin, y, "■　今後の流れ")
+    y -= 8
+    c.setStrokeColor(DARK)
+    c.setLineWidth(0.8)
+    c.line(margin, y, PAGE_W - margin, y)
+
+    y -= 20
+    flow = (
+        "書類が弊社に到着してから、原則として1週間以内に、"
+        "内容を確認のうえお見積り・今後のご案内をご連絡いたします。"
+        "ご不明な点がございましたら、お気軽にお電話ください。"
+    )
+    y = _draw_wrapped_text(
+        c, flow, margin, y, PAGE_W - 2 * margin, _font(), 11, leading=16
+    )
+
+    # 備考
+    notes = customer.get("notes", "").strip()
+    if notes:
+        y -= 24
+        c.setFont(_font(True), 11)
+        c.drawString(margin, y, "【備考】")
+        y -= 14
+        _draw_wrapped_text(
+            c, notes, margin, y, PAGE_W - 2 * margin, _font(), 10, leading=14
+        )
+
+    # フッター
+    c.setFont(_font(), 8)
+    c.setFillColor(GRAY)
+    c.drawCentredString(
+        PAGE_W / 2,
+        12 * mm,
+        f"{company.get('company_name', '')}　｜　山林引き取りご相談 郵送キット",
+    )
+
+
+def _draw_hearing_sheet(c: canvas.Canvas, customer: dict, company: dict) -> None:
+    margin = 18 * mm
+    y = PAGE_H - 18 * mm
+
+    # タイトル
+    c.setFillColor(colors.Color(0.95, 0.95, 0.93))
+    c.setStrokeColor(DARK)
+    c.setLineWidth(1.2)
+    c.roundRect(margin, y - 8, PAGE_W - 2 * margin, 30, 3, stroke=1, fill=1)
+    c.setFont(_font(True), 15)
+    c.setFillColor(DARK)
+    c.drawCentredString(PAGE_W / 2, y, "山林引き取り　簡易ヒアリングシート")
+
+    y -= 40
+    # 事前印字：氏名・管理番号
+    c.setFont(_font(), 11)
+    name = customer.get("name", "")
+    honorific = customer.get("honorific", "様")
+    mgmt = customer.get("management_no", "")
+    c.drawString(margin, y, f"お客様氏名：{name}　{honorific}")
+    if mgmt:
+        c.drawRightString(PAGE_W - margin, y, f"管理番号：{mgmt}")
+
+    y -= 16
+    phone = customer.get("phone", "")
+    if phone:
+        c.setFont(_font(), 10)
+        c.drawString(margin, y, f"電話番号：{phone}")
+        y -= 14
+
+    # 対象山林の指定
+    y -= 8
+    c.setFont(_font(True), 12)
+    c.setFillColor(DARK)
+    c.drawString(margin, y, "■　対象となる山林の指定")
+    y -= 6
+
+    box_h = 52
+    forest_loc = customer.get("forest_location", "").strip()
+    if forest_loc:
+        box_h = 68
+
+    c.setStrokeColor(DARK)
+    c.setLineWidth(1)
+    c.setFillColor(colors.Color(1, 0.97, 0.97))
+    c.roundRect(margin, y - box_h, PAGE_W - 2 * margin, box_h, 2, stroke=1, fill=1)
+
+    inner_y = y - 14
+    guide = (
+        "同封いただく『課税明細書』のコピーの中で、"
+        "引き取りをご希望される山林の行に【赤ペン等で丸（〇）】をつけてください。"
+    )
+    inner_y = _draw_wrapped_text(
+        c,
+        guide,
+        margin + 8,
+        inner_y,
+        PAGE_W - 2 * margin - 16,
+        _font(),
+        10.5,
+        leading=14,
+        color=DARK,
+    )
+    if forest_loc:
+        inner_y -= 16
+        c.setFont(_font(True), 10)
+        c.setFillColor(DARK)
+        c.drawString(margin + 8, inner_y, "事前にお伺いした所在地：")
+        inner_y -= 14
+        _draw_wrapped_text(
+            c,
+            forest_loc,
+            margin + 8,
+            inner_y,
+            PAGE_W - 2 * margin - 16,
+            _font(),
+            10.5,
+            color=DARK,
+        )
+
+    y = y - box_h - 20
+
+    # 質問セクション
+    c.setFont(_font(True), 12)
+    c.setFillColor(DARK)
+    c.drawString(margin, y, "■　簡単なご質問（該当するものに ✓ をつけてください）")
+    y -= 20
+
+    questions = [
+        (
+            "１．名義について",
+            ["単独名義", "共有名義", "相続未登記（名義変更前）"],
+        ),
+        (
+            "２．境界の把握",
+            ["だいたい分かる", "全く分からない"],
+        ),
+        (
+            "３．山林の状態",
+            ["建物・工作物なし", "建物・小屋あり", "不明"],
+        ),
+        (
+            "４．ご連絡希望の時間帯",
+            ["午前中", "13〜17時", "17時以降", "いつでも可"],
+        ),
+    ]
+
+    for q_title, options in questions:
+        c.setFont(_font(True), 11)
+        c.setFillColor(DARK)
+        c.drawString(margin, y, q_title)
+        y -= 18
+        opt_x = margin + 8
+        for opt in options:
+            box = 12
+            c.setStrokeColor(DARK)
+            c.setLineWidth(1.1)
+            c.setFillColor(colors.white)
+            c.rect(opt_x, y - 2, box, box, stroke=1, fill=1)
+            c.setFont(_font(), 10.5)
+            c.setFillColor(DARK)
+            c.drawString(opt_x + box + 5, y, opt)
+            opt_w = pdfmetrics.stringWidth(opt, _font(), 10.5) + box + 18
+            opt_x += opt_w
+            if opt_x > PAGE_W - margin - 50 * mm:
+                opt_x = margin + 8
+                y -= 18
+        y -= 22
+
+    # 自由記入欄
+    c.setFont(_font(True), 12)
+    c.setFillColor(DARK)
+    c.drawString(margin, y, "■　自由記入欄・ご質問欄")
+    y -= 8
+
+    notes = customer.get("notes", "").strip()
+    free_h = 90
+    c.setStrokeColor(DARK)
+    c.setLineWidth(0.9)
+    c.setFillColor(colors.white)
+    c.rect(margin, y - free_h, PAGE_W - 2 * margin, free_h, stroke=1, fill=1)
+
+    # 点線ガイド
+    c.setStrokeColor(LIGHT_GRAY)
+    c.setDash(2, 3)
+    line_y = y - 18
+    while line_y > y - free_h + 8:
+        c.line(margin + 4, line_y, PAGE_W - margin - 4, line_y)
+        line_y -= 16
+    c.setDash()
+
+    if notes:
+        _draw_wrapped_text(
+            c,
+            f"（備考）{notes}",
+            margin + 6,
+            y - 14,
+            PAGE_W - 2 * margin - 12,
+            _font(),
+            9,
+            color=GRAY,
+        )
+
+    # フッター
+    c.setFont(_font(), 8)
+    c.setFillColor(GRAY)
+    c.drawCentredString(
+        PAGE_W / 2,
+        12 * mm,
+        f"{company.get('company_name', '')}　｜　ご記入後、他の書類と一緒にご返送ください",
+    )
+
+
+# ---------------------------------------------------------------------------
+# 宛名ラベル PDF
+# ---------------------------------------------------------------------------
+# 長形3号封筒（120×235mm）に貼付するラベル枠サイズ
+CHOU3_LABEL_W = 95 * mm
+CHOU3_LABEL_H = 55 * mm
+
+
+def generate_labels_pdf(
+    customer: dict,
+    company: dict,
+    *,
+    mode: str = "C",
+    layout: str = "2面",
+    offset_x_mm: float = 0.0,
+    offset_y_mm: float = 0.0,
+    show_guides: bool = False,
+) -> bytes:
+    """
+    宛名ラベル PDF を生成する。
+
+    mode:
+      "C" — 長3封筒貼付用（95×55mm × 往信・返信）
+      "A" — A4ノーカット（上下2分割・切り取り線）
+      "B" — 市販マルチプリンタラベル（2面 or 4面）
+    layout: "2面" | "4面"（mode B のみ）
+    """
+    ensure_fonts()
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    ox = offset_x_mm * mm
+    oy = offset_y_mm * mm
+
+    if mode == "C":
+        _draw_mode_chou3(c, customer, company, ox, oy, show_guides)
+    elif mode == "A":
+        _draw_mode_a(c, customer, company, ox, oy, show_guides)
+    else:
+        _draw_mode_b(c, customer, company, layout, ox, oy, show_guides)
+
+    c.save()
+    return buf.getvalue()
+
+
+def _label_outbound(
+    c: canvas.Canvas,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    customer: dict,
+    show_guides: bool,
+    *,
+    badge_extra: str = "",
+) -> None:
+    """往信用ラベル内容を枠内に描画。 (x,y) は左下。"""
+    compact = h < 70 * mm
+    pad = 4 * mm if compact else 8 * mm
+    if show_guides:
+        c.setStrokeColor(colors.Color(0.6, 0.6, 0.8))
+        c.setDash(1, 2)
+        c.setLineWidth(0.5)
+        c.rect(x, y, w, h, stroke=1, fill=0)
+        c.setDash()
+
+    # 種別バッジ
+    badge = "【往信用】お客様宛" + (f"　{badge_extra}" if badge_extra else "")
+    c.setFont(_font(True), 7 if compact else 8)
+    c.setFillColor(GRAY)
+    c.drawString(x + pad, y + h - (5.5 * mm if compact else 8 * mm), badge)
+
+    # 郵便番号
+    postal = customer.get("postal_code", "")
+    ty = y + h - (11 * mm if compact else 16 * mm)
+    if postal:
+        c.setFont(_font(True), 12 if compact else 14)
+        c.setFillColor(DARK)
+        c.drawString(x + pad, ty, f"〒 {postal}")
+        ty -= 5.5 * mm if compact else 8 * mm
+
+    # 住所（自動縮小・改行）
+    addr = customer.get("address", "")
+    addr_max_w = w - 2 * pad
+    font_size = 9.5 if compact else 11
+    max_addr_lines = 2 if compact else 4
+    lines = _wrap_text(addr, _font(), font_size, addr_max_w)
+    while len(lines) > max_addr_lines and font_size > 7.0:
+        font_size -= 0.5
+        lines = _wrap_text(addr, _font(), font_size, addr_max_w)
+    for i, line in enumerate(lines[:max_addr_lines]):
+        c.setFont(_font(), font_size)
+        c.setFillColor(DARK)
+        c.drawString(x + pad, ty - i * (font_size + 2), line)
+    ty -= len(lines[:max_addr_lines]) * (font_size + 2) + (3.5 * mm if compact else 6 * mm)
+
+    # 氏名＋敬称
+    name = customer.get("name", "")
+    honorific = customer.get("honorific", "様")
+    name_text = f"{name}　{honorific}"
+    name_size = _fit_font_size(
+        name_text, _font(True), addr_max_w, 14 if compact else 18, 10
+    )
+    c.setFont(_font(True), name_size)
+    c.setFillColor(DARK)
+    c.drawString(x + pad, max(ty, y + (10 * mm if compact else 14 * mm)), name_text)
+
+    # 管理番号（左下）
+    mgmt = customer.get("management_no", "")
+    if mgmt:
+        c.setFont(_font(), 7 if compact else 8)
+        c.setFillColor(GRAY)
+        c.drawString(x + pad, y + (3 * mm if compact else 5 * mm), f"管理番号：{mgmt}")
+
+
+def _label_return(
+    c: canvas.Canvas,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    company: dict,
+    show_guides: bool,
+    *,
+    badge_extra: str = "",
+) -> None:
+    """返信用ラベル内容を枠内に描画。 (x,y) は左下。"""
+    compact = h < 70 * mm
+    pad = 4 * mm if compact else 8 * mm
+    if show_guides:
+        c.setStrokeColor(colors.Color(0.6, 0.6, 0.8))
+        c.setDash(1, 2)
+        c.setLineWidth(0.5)
+        c.rect(x, y, w, h, stroke=1, fill=0)
+        c.setDash()
+
+    # 種別
+    badge = "【返信用】弊社宛" + (f"　{badge_extra}" if badge_extra else "")
+    c.setFont(_font(True), 7 if compact else 8)
+    c.setFillColor(GRAY)
+    c.drawString(x + pad, y + h - (5.5 * mm if compact else 8 * mm), badge)
+
+    # 切手貼付欄（右上）
+    stamp_w = 16 * mm if compact else 22 * mm
+    stamp_h = 12 * mm if compact else 18 * mm
+    sx = x + w - pad - stamp_w
+    sy = y + h - (7 * mm if compact else 10 * mm) - stamp_h
+    c.setStrokeColor(GRAY)
+    c.setDash(2, 2)
+    c.setLineWidth(0.8)
+    c.rect(sx, sy, stamp_w, stamp_h, stroke=1, fill=0)
+    c.setDash()
+    c.setFont(_font(), 6 if compact else 7)
+    c.setFillColor(GRAY)
+    c.drawCentredString(sx + stamp_w / 2, sy + stamp_h / 2 - 2, "切手貼付欄")
+
+    # 郵便番号・住所
+    ty = y + h - (12 * mm if compact else 18 * mm)
+    postal = company.get("postal_code", "")
+    if postal:
+        c.setFont(_font(True), 11 if compact else 13)
+        c.setFillColor(DARK)
+        c.drawString(x + pad, ty, f"〒 {postal}")
+        ty -= 5 * mm if compact else 7 * mm
+
+    addr = company.get("address", "")
+    addr_max_w = w - 2 * pad - stamp_w - 2 * mm
+    font_size = 8.5 if compact else 10
+    max_lines = 2 if compact else 3
+    lines = _wrap_text(addr, _font(), font_size, addr_max_w)
+    while len(lines) > max_lines and font_size > 6.5:
+        font_size -= 0.5
+        lines = _wrap_text(addr, _font(), font_size, addr_max_w)
+    for i, line in enumerate(lines[:max_lines]):
+        c.setFont(_font(), font_size)
+        c.setFillColor(DARK)
+        c.drawString(x + pad, ty - i * (font_size + 2), line)
+    ty -= len(lines[:max_lines]) * (font_size + 2) + (3 * mm if compact else 5 * mm)
+
+    # 社名 部署 御中
+    company_name = company.get("company_name", "合同会社山林パートナーズ")
+    dept = company.get("department", "山林引き取り受付係")
+    c.setFont(_font(True), 9 if compact else 10)
+    c.setFillColor(DARK)
+    line1 = company_name
+    line2 = f"{dept}　御中"
+    name_y = max(ty, y + (18 * mm if compact else 28 * mm))
+    c.drawString(x + pad, name_y, line1)
+    c.setFont(_font(True), 10 if compact else 12)
+    c.drawString(x + pad, max(name_y - (11 if compact else 14), y + (10 * mm if compact else 18 * mm)), line2)
+
+    # 重要メッセージ（左下・赤枠赤字）
+    msg = "【重要】固定資産税書類・確認書在中"
+    msg_size = 6.5 if compact else 8
+    c.setFont(_font(True), msg_size)
+    msg_w = pdfmetrics.stringWidth(msg, _font(True), msg_size) + 6
+    msg_h = 10 if compact else 12
+    mx = x + pad
+    my = y + (2.5 * mm if compact else 5 * mm)
+    c.setStrokeColor(RED)
+    c.setFillColor(colors.Color(1, 0.95, 0.95))
+    c.setLineWidth(1.0)
+    c.rect(mx, my, min(msg_w, w - 2 * pad), msg_h, stroke=1, fill=1)
+    c.setFillColor(RED)
+    c.drawString(mx + 3, my + 2.5, msg)
+
+
+def _draw_mode_chou3(
+    c: canvas.Canvas,
+    customer: dict,
+    company: dict,
+    ox: float,
+    oy: float,
+    show_guides: bool,
+) -> None:
+    """
+    モードC: 長形3号封筒（120×235mm）貼付用。
+    A4中央に 95×55mm の往信・返信ラベルを上下に配置。
+    """
+    lw, lh = CHOU3_LABEL_W, CHOU3_LABEL_H
+    gap = 18 * mm
+    total_h = lh * 2 + gap
+    left = (PAGE_W - lw) / 2 + ox
+    bottom_y = (PAGE_H - total_h) / 2 + oy
+    top_y = bottom_y + lh + gap
+
+    # ページ案内
+    c.setFont(_font(True), 10)
+    c.setFillColor(DARK)
+    c.drawCentredString(
+        PAGE_W / 2 + ox,
+        PAGE_H - 15 * mm + oy,
+        "長形3号封筒（120×235mm）貼付用ラベル",
+    )
+    c.setFont(_font(), 8)
+    c.setFillColor(GRAY)
+    c.drawCentredString(
+        PAGE_W / 2 + ox,
+        PAGE_H - 20 * mm + oy,
+        "切り取って封筒おもて面に貼付してください（上：往信／下：返信）",
+    )
+
+    # 常に実線枠（切り取りガイド）。show_guides 時は点線ガイドも内側に
+    for (lx, ly) in ((left, top_y), (left, bottom_y)):
+        c.setStrokeColor(DARK)
+        c.setLineWidth(0.9)
+        c.setDash()
+        c.rect(lx, ly, lw, lh, stroke=1, fill=0)
+
+    _label_outbound(
+        c, left, top_y, lw, lh, customer, show_guides, badge_extra="長3封筒用"
+    )
+    _label_return(
+        c, left, bottom_y, lw, lh, company, show_guides, badge_extra="長3封筒用"
+    )
+
+    # 中間の切り取り案内
+    mid = bottom_y + lh + gap / 2
+    c.setStrokeColor(GRAY)
+    c.setDash(2, 2)
+    c.setLineWidth(0.6)
+    c.line(left, mid, left + lw, mid)
+    c.setDash()
+    c.setFont(_font(), 7)
+    c.setFillColor(GRAY)
+    c.drawCentredString(left + lw / 2, mid + 2, "✂ 切り取り")
+
+
+def _draw_mode_a(
+    c: canvas.Canvas,
+    customer: dict,
+    company: dict,
+    ox: float,
+    oy: float,
+    show_guides: bool,
+) -> None:
+    """モードA: A4上下2分割（上：往信、下：返信）＋切り取り線。"""
+    half_h = PAGE_H / 2
+    # 上段（往信）
+    _label_outbound(
+        c, 0 + ox, half_h + oy, PAGE_W, half_h, customer, show_guides
+    )
+    # 下段（返信）
+    _label_return(
+        c, 0 + ox, 0 + oy, PAGE_W, half_h, company, show_guides
+    )
+
+    # 中央切り取り線
+    mid_y = half_h + oy
+    c.setStrokeColor(GRAY)
+    c.setDash(3, 3)
+    c.setLineWidth(0.7)
+    c.line(10 * mm + ox, mid_y, PAGE_W - 10 * mm + ox, mid_y)
+    c.setDash()
+    c.setFont(_font(), 7)
+    c.setFillColor(GRAY)
+    c.drawCentredString(PAGE_W / 2 + ox, mid_y + 2, "✂ ここから切り取ってください（上：往信／下：返信）")
+
+    # 外側ガイド（常に薄い枠を表示して切り取りやすく）
+    if show_guides:
+        c.setStrokeColor(colors.Color(0.7, 0.7, 0.7))
+        c.setLineWidth(0.4)
+        c.rect(5 * mm + ox, 5 * mm + oy, PAGE_W - 10 * mm, PAGE_H - 10 * mm)
+
+
+def _draw_mode_b(
+    c: canvas.Canvas,
+    customer: dict,
+    company: dict,
+    layout: str,
+    ox: float,
+    oy: float,
+    show_guides: bool,
+) -> None:
+    """モードB: A4 2面 or 4面ラベル。"""
+    if layout == "4面":
+        # 105mm × 148.5mm × 4
+        lw, lh = 105 * mm, 148.5 * mm
+        positions = [
+            (0 + ox, lh + oy),       # 左上 → 往信
+            (lw + ox, lh + oy),      # 右上 → 返信
+            (0 + ox, 0 + oy),        # 左下 → 往信（予備）
+            (lw + ox, 0 + oy),       # 右下 → 返信（予備）
+        ]
+        _label_outbound(c, *positions[0], lw, lh, customer, show_guides)
+        _label_return(c, *positions[1], lw, lh, company, show_guides)
+        _label_outbound(c, *positions[2], lw, lh, customer, show_guides)
+        _label_return(c, *positions[3], lw, lh, company, show_guides)
+    else:
+        # A4 2面: 210mm × 148.5mm
+        lw, lh = PAGE_W, 148.5 * mm
+        _label_outbound(c, 0 + ox, lh + oy, lw, lh, customer, show_guides)
+        _label_return(c, 0 + ox, 0 + oy, lw, lh, company, show_guides)
+
+    if show_guides:
+        c.setStrokeColor(colors.Color(0.5, 0.5, 0.7))
+        c.setLineWidth(0.5)
+        c.setDash(1, 1)
+        if layout == "4面":
+            c.line(105 * mm + ox, 0 + oy, 105 * mm + ox, PAGE_H + oy)
+            c.line(0 + ox, 148.5 * mm + oy, PAGE_W + ox, 148.5 * mm + oy)
+        else:
+            c.line(0 + ox, 148.5 * mm + oy, PAGE_W + ox, 148.5 * mm + oy)
+        c.setDash()
+
+
+# ---------------------------------------------------------------------------
+# 一括 PDF（同封書類 + ラベル）
+# ---------------------------------------------------------------------------
+def generate_combined_pdf(
+    customer: dict,
+    company: dict,
+    *,
+    mode: str = "C",
+    layout: str = "2面",
+    offset_x_mm: float = 0.0,
+    offset_y_mm: float = 0.0,
+    show_guides: bool = False,
+) -> bytes:
+    """確認用：同封書類 + 宛名ラベルを1つの PDF にまとめる。"""
+    ensure_fonts()
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    _draw_cover_letter(c, customer, company)
+    c.showPage()
+    _draw_hearing_sheet(c, customer, company)
+    c.showPage()
+    ox = offset_x_mm * mm
+    oy = offset_y_mm * mm
+    if mode == "C":
+        _draw_mode_chou3(c, customer, company, ox, oy, show_guides)
+    elif mode == "A":
+        _draw_mode_a(c, customer, company, ox, oy, show_guides)
+    else:
+        _draw_mode_b(c, customer, company, layout, ox, oy, show_guides)
+    c.save()
+    return buf.getvalue()

@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+output/*.pdf
+output/preview_images/
+data/history.csv
+data/management_counter.json
+data/google_service_account.json
+.streamlit/secrets.toml
