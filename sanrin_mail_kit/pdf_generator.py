@@ -543,18 +543,17 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     pad_top = 14
     gap_after_guide = 20
     gap_label_to_table = 8
-    gap_table_to_note = 18
-    pad_bottom = 16
+    pad_bottom = 14
 
-    # まず各要素の Y を確定してから枠を描く（枠線との重なりを防ぐ）
+    # まず各要素の Y を確定してから枠を描く（注記は枠の外に出す）
     box_top = y
     guide_y = box_top - pad_top
     guide_bottom_y = guide_y - (len(guide_lines) - 1) * guide_leading
     label_y = guide_bottom_y - gap_after_guide
     table_top = label_y - 16 - gap_label_to_table
-    note_y = table_top - table_h - gap_table_to_note
-    box_bottom = note_y - pad_bottom
+    box_bottom = table_top - table_h - pad_bottom
     box_h = box_top - box_bottom
+    note_y = box_bottom - 18
 
     c.setStrokeColor(DARK)
     c.setLineWidth(1.1)
@@ -628,7 +627,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         "※ 上の例のように、引き取りを希望する土地の所在地の左側（または地番）に丸をつけてください。",
     )
 
-    y = box_bottom - 22
+    y = note_y - 24
 
     c.setFont(body, 15)
     c.setFillColor(DARK)
