@@ -388,6 +388,14 @@ def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
     y = _draw_wrapped_text(
         c, intro, margin, y, PAGE_W - 2 * margin, body, 13, leading=20
     )
+    y -= 18
+    apology = (
+        "なお、初回のお届けのため宛名がカタカナ表記となっておりますこと、"
+        "失礼のほどお詫び申し上げます。"
+    )
+    y = _draw_wrapped_text(
+        c, apology, margin, y, PAGE_W - 2 * margin, body, 12, leading=18, color=GRAY
+    )
 
     y -= 28
     c.setFont(body, 15)
