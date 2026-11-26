@@ -524,7 +524,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     c.drawString(margin, y, "■　対象となる土地・物件の指定")
     y -= 8
 
-    box_h = 118
+    box_h = 148
     c.setStrokeColor(DARK)
     c.setLineWidth(1.1)
     c.setFillColor(colors.Color(1, 0.97, 0.97))
@@ -547,10 +547,9 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     )
 
     # 所在地の左側に丸を付ける記入例（地番は隠さない）
-    ex_y = y - 58
     c.setFont(body, 12)
     c.setFillColor(DARK)
-    c.drawString(margin + 10, ex_y + 18, "【記入例】")
+    c.drawString(margin + 10, y - 52, "【記入例】")
 
     # 簡易テーブル風の例（左に丸用の余白）
     mark_w = 28
@@ -563,7 +562,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
 
     header_h = 18
     row_h = 22
-    table_top = ex_y + 8
+    table_top = y - 58
     c.setFillColor(colors.Color(0.92, 0.92, 0.90))
     c.setStrokeColor(DARK)
     c.setLineWidth(0.9)
@@ -593,15 +592,16 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     c.setStrokeColor(RED)
     c.setLineWidth(2.2)
     c.circle(mark_cx, mark_cy, 11, stroke=1, fill=0)
-    c.setFont(body, 10)
+    c.setFont(body, 9)
     c.setFillColor(RED)
-    c.drawCentredString(mark_cx, mark_cy + row_h + 2, "引き取り希望")
+    c.drawRightString(mark_cx - 14, mark_cy - 3, "引き取り希望")
 
+    table_bottom = table_top - header_h - 2 * row_h
     c.setFont(body, 10)
     c.setFillColor(GRAY)
     c.drawString(
         margin + 10,
-        y - box_h + 8,
+        table_bottom - 16,
         "※ 上の例のように、引き取りを希望する土地の所在地の左側（または地番）に丸をつけてください。",
     )
 
