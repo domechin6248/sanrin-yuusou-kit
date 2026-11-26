@@ -551,11 +551,12 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     c.setFillColor(DARK)
     c.drawString(margin + 10, y - 52, "【記入例】")
 
-    # 簡易テーブル風の例（左に丸用の余白）
-    mark_w = 28
+    # 簡易テーブル風の例（左に丸用の余白／右に説明用の余白）
+    mark_w = 26
+    note_w = 78
     table_x = margin + 10 + mark_w
-    table_w = PAGE_W - 2 * margin - 20 - mark_w
-    col_w = [table_w * 0.34, table_w * 0.22, table_w * 0.16, table_w * 0.28]
+    table_w = PAGE_W - 2 * margin - 20 - mark_w - note_w
+    col_w = [table_w * 0.36, table_w * 0.22, table_w * 0.18, table_w * 0.24]
     headers = ["所在地", "地番", "地目", "面積"]
     row1 = ["〇〇市△△町", "1234番", "山林", "2,500㎡"]
     row2 = ["〇〇市△△町", "56番7", "原野", "800㎡"]
@@ -567,10 +568,16 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     c.setStrokeColor(DARK)
     c.setLineWidth(0.9)
     c.rect(table_x, table_top - header_h, table_w, header_h, stroke=1, fill=1)
+
+    # 列区切り線（ヘッダー）
+    hx = table_x
     c.setFont(body, 11)
     c.setFillColor(DARK)
-    hx = table_x
     for i, h in enumerate(headers):
+        if i > 0:
+            c.setStrokeColor(DARK)
+            c.setLineWidth(0.7)
+            c.line(hx, table_top, hx, table_top - header_h)
         c.drawCentredString(hx + col_w[i] / 2, table_top - 13, h)
         hx += col_w[i]
 
@@ -578,23 +585,28 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         ry = table_top - header_h - (ri + 1) * row_h
         c.setFillColor(colors.white)
         c.setStrokeColor(DARK)
+        c.setLineWidth(0.9)
         c.rect(table_x, ry, table_w, row_h, stroke=1, fill=1)
+        cx = table_x
         c.setFont(body, 11)
         c.setFillColor(DARK)
-        cx = table_x
         for i, cell in enumerate(row):
+            if i > 0:
+                c.setStrokeColor(DARK)
+                c.setLineWidth(0.7)
+                c.line(cx, ry, cx, ry + row_h)
             c.drawCentredString(cx + col_w[i] / 2, ry + 6, cell)
             cx += col_w[i]
 
-    # 1行目・所在地の左側に赤丸＋「引き取り希望」ラベル
+    # 1行目・所在地の左側に赤丸／説明は表の右側へ（文字の重なり防止）
     mark_cx = table_x - mark_w / 2
     mark_cy = table_top - header_h - row_h / 2
     c.setStrokeColor(RED)
     c.setLineWidth(2.2)
-    c.circle(mark_cx, mark_cy, 11, stroke=1, fill=0)
-    c.setFont(body, 9)
+    c.circle(mark_cx, mark_cy, 10, stroke=1, fill=0)
+    c.setFont(body, 10)
     c.setFillColor(RED)
-    c.drawRightString(mark_cx - 14, mark_cy - 3, "引き取り希望")
+    c.drawString(table_x + table_w + 6, mark_cy - 3, "← 引き取り希望")
 
     table_bottom = table_top - header_h - 2 * row_h
     c.setFont(body, 10)
@@ -624,10 +636,6 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         (
             "３．土地・物件の状態",
             ["建物・工作物なし", "建物・小屋あり", "不明"],
-        ),
-        (
-            "４．ご連絡希望の時間帯",
-            ["午前中", "13〜17時", "17時以降", "いつでも可"],
         ),
     ]
 
