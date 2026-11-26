@@ -494,9 +494,23 @@ def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
 def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     """共通ヒアリングシート。連絡先は下部の手書き欄。"""
     margin = 16 * mm
-    y = PAGE_H - 16 * mm
+    y = PAGE_H - 14 * mm
     body = _font(True)
 
+    # 大きく目立たせる返送案内
+    banner_h = 28
+    c.setFillColor(colors.Color(0.85, 0.12, 0.12))
+    c.setStrokeColor(colors.Color(0.85, 0.12, 0.12))
+    c.roundRect(margin, y - 6, PAGE_W - 2 * margin, banner_h, 3, stroke=0, fill=1)
+    c.setFont(body, 16)
+    c.setFillColor(colors.white)
+    c.drawCentredString(
+        PAGE_W / 2,
+        y + 2,
+        "この用紙はご記入のうえ、他の書類と一緒に【必ずご返送ください】",
+    )
+
+    y -= 42
     c.setFillColor(colors.Color(0.95, 0.95, 0.93))
     c.setStrokeColor(DARK)
     c.setLineWidth(1.3)
@@ -505,12 +519,12 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     c.setFillColor(DARK)
     c.drawCentredString(PAGE_W / 2, y, "土地引き取り　簡易ヒアリングシート")
 
-    y -= 42
+    y -= 40
     c.setFont(body, 15)
     c.drawString(margin, y, "■　対象となる土地・物件の指定")
     y -= 8
 
-    box_h = 78
+    box_h = 118
     c.setStrokeColor(DARK)
     c.setLineWidth(1.1)
     c.setFillColor(colors.Color(1, 0.97, 0.97))
@@ -518,27 +532,84 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
 
     guide = (
         "同封いただく固定資産の書類（課税明細書・名寄せ帳・公課証明書など）のコピーの中で、"
-        "引き取りをご希望される土地・物件の行に【赤ペン等で丸（〇）】をつけてください。"
-        "所在地・地番・地目が分かる箇所に印をつけていただけると助かります。"
+        "引き取りをご希望される土地・物件の【地番】に赤ペン等で丸（〇）をつけてください。"
     )
     _draw_wrapped_text(
         c,
         guide,
         margin + 10,
-        y - 18,
+        y - 16,
         PAGE_W - 2 * margin - 20,
         body,
-        13,
-        leading=19,
+        12,
+        leading=17,
         color=DARK,
     )
 
-    y = y - box_h - 26
+    # 地番に丸を付ける記入例
+    ex_y = y - 58
+    c.setFont(body, 12)
+    c.setFillColor(DARK)
+    c.drawString(margin + 10, ex_y + 18, "【記入例】")
+
+    # 簡易テーブル風の例
+    table_x = margin + 10
+    table_w = PAGE_W - 2 * margin - 20
+    col_w = [table_w * 0.34, table_w * 0.22, table_w * 0.16, table_w * 0.28]
+    headers = ["所在地", "地番", "地目", "面積"]
+    row1 = ["〇〇市△△町", "1234番", "山林", "2,500㎡"]
+    row2 = ["〇〇市△△町", "56番7", "原野", "800㎡"]
+
+    header_h = 18
+    row_h = 22
+    table_top = ex_y + 8
+    c.setFillColor(colors.Color(0.92, 0.92, 0.90))
+    c.setStrokeColor(DARK)
+    c.setLineWidth(0.9)
+    c.rect(table_x, table_top - header_h, table_w, header_h, stroke=1, fill=1)
+    c.setFont(body, 11)
+    c.setFillColor(DARK)
+    hx = table_x
+    for i, h in enumerate(headers):
+        c.drawCentredString(hx + col_w[i] / 2, table_top - 13, h)
+        hx += col_w[i]
+
+    for ri, row in enumerate([row1, row2]):
+        ry = table_top - header_h - (ri + 1) * row_h
+        c.setFillColor(colors.white)
+        c.setStrokeColor(DARK)
+        c.rect(table_x, ry, table_w, row_h, stroke=1, fill=1)
+        c.setFont(body, 11)
+        c.setFillColor(DARK)
+        cx = table_x
+        for i, cell in enumerate(row):
+            c.drawCentredString(cx + col_w[i] / 2, ry + 6, cell)
+            cx += col_w[i]
+
+    # 1行目の地番に赤丸＋「引き取り希望」ラベル
+    chipan_cx = table_x + col_w[0] + col_w[1] / 2
+    chipan_cy = table_top - header_h - row_h / 2
+    c.setStrokeColor(RED)
+    c.setLineWidth(2.2)
+    c.circle(chipan_cx, chipan_cy, 14, stroke=1, fill=0)
+    c.setFont(body, 11)
+    c.setFillColor(RED)
+    c.drawString(table_x + col_w[0] + col_w[1] + 4, chipan_cy + 16, "← 引き取り希望")
+
+    c.setFont(body, 10)
+    c.setFillColor(GRAY)
+    c.drawString(
+        margin + 10,
+        y - box_h + 8,
+        "※ 上の例のように、引き取りを希望する土地の地番に丸をつけてください。",
+    )
+
+    y = y - box_h - 22
 
     c.setFont(body, 15)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　簡単なご質問（該当するものに ✓ をつけてください）")
-    y -= 26
+    y -= 24
 
     questions = [
         (
@@ -563,7 +634,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         c.setFont(body, 14)
         c.setFillColor(DARK)
         c.drawString(margin, y, q_title)
-        y -= 22
+        y -= 20
         opt_x = margin + 8
         for opt in options:
             box = 15
@@ -578,15 +649,15 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
             opt_x += opt_w
             if opt_x > PAGE_W - margin - 55 * mm:
                 opt_x = margin + 8
-                y -= 22
-        y -= 28
+                y -= 20
+        y -= 24
 
     c.setFont(body, 15)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　自由記入欄・ご質問欄")
-    y -= 10
+    y -= 8
 
-    free_h = 52
+    free_h = 44
     c.setStrokeColor(DARK)
     c.setLineWidth(1.1)
     c.setFillColor(colors.white)
@@ -594,21 +665,21 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
 
     c.setStrokeColor(LIGHT_GRAY)
     c.setDash(2, 3)
-    line_y = y - 24
-    while line_y > y - free_h + 8:
+    line_y = y - 20
+    while line_y > y - free_h + 6:
         c.line(margin + 4, line_y, PAGE_W - margin - 4, line_y)
-        line_y -= 22
+        line_y -= 18
     c.setDash()
 
-    # 下部：ご連絡先（高齢者でも書きやすい高めの記入枠）
-    y = y - free_h - 24
+    # 下部：ご連絡先（枠線なし・高めの記入ライン）
+    y = y - free_h - 22
     c.setFont(body, 15)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　ご連絡先（ご記入ください）")
-    y -= 18
+    y -= 16
 
-    field_h = 36
-    field_gap = 12
+    field_h = 34
+    field_gap = 10
     label_w = 78
     fields = [
         ("お名前", True),
@@ -616,23 +687,16 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         ("お電話番号", False),
     ]
     for label, with_sama in fields:
-        box_top = y
         box_bottom = y - field_h
-        c.setStrokeColor(DARK)
-        c.setLineWidth(1.2)
-        c.setFillColor(colors.white)
-        c.roundRect(margin, box_bottom, PAGE_W - 2 * margin, field_h, 2, stroke=1, fill=1)
-
         c.setFont(body, 13)
         c.setFillColor(DARK)
-        c.drawString(margin + 10, box_bottom + field_h / 2 - 4, f"{label}")
+        c.drawString(margin, box_bottom + field_h / 2 - 4, label)
 
-        # 記入ライン
         line_left = margin + label_w
-        line_right = PAGE_W - margin - (28 if with_sama else 10)
-        c.setStrokeColor(LIGHT_GRAY)
+        line_right = PAGE_W - margin - (28 if with_sama else 4)
+        c.setStrokeColor(DARK)
         c.setLineWidth(1)
-        c.line(line_left, box_bottom + 10, line_right, box_bottom + 10)
+        c.line(line_left, box_bottom + 8, line_right, box_bottom + 8)
 
         if with_sama:
             c.setFont(body, 14)
@@ -641,12 +705,20 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
 
         y = box_bottom - field_gap
 
-    c.setFont(body, 11)
+    # 下部にも返送の案内を大きく
+    c.setFont(body, 14)
+    c.setFillColor(RED)
+    c.drawCentredString(
+        PAGE_W / 2,
+        16 * mm,
+        "ご記入後、このヒアリングシートを必ずご返送ください",
+    )
+    c.setFont(body, 10)
     c.setFillColor(GRAY)
     c.drawCentredString(
         PAGE_W / 2,
-        12 * mm,
-        f"{company.get('company_name', '')}　｜　ご記入後、他の書類と一緒にご返送ください",
+        10 * mm,
+        f"{company.get('company_name', '')}",
     )
 
 
