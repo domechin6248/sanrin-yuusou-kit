@@ -521,55 +521,80 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
 
     y -= 40
     c.setFont(body, 15)
+    c.setFillColor(DARK)
     c.drawString(margin, y, "■　対象となる土地・物件の指定")
-    y -= 8
+    y -= 10
 
-    box_h = 148
-    c.setStrokeColor(DARK)
-    c.setLineWidth(1.1)
-    c.setFillColor(colors.Color(1, 0.97, 0.97))
-    c.roundRect(margin, y - box_h, PAGE_W - 2 * margin, box_h, 2, stroke=1, fill=1)
-
+    content_x = margin + 10
+    content_w = PAGE_W - 2 * margin - 20
     guide = (
         "同封いただく固定資産の書類（課税明細書・名寄せ帳・公課証明書など）のコピーの中で、"
         "引き取りをご希望される土地・物件の行（所在地の左側または地番）に赤ペン等で丸（〇）をつけてください。"
     )
-    _draw_wrapped_text(
-        c,
-        guide,
-        margin + 10,
-        y - 16,
-        PAGE_W - 2 * margin - 20,
-        body,
-        12,
-        leading=17,
-        color=DARK,
-    )
+    guide_leading = 17
+    guide_lines = _wrap_text(guide, body, 12, content_w)
+    guide_h = max(len(guide_lines) - 1, 0) * guide_leading + 12
 
-    # 所在地の左側に丸を付ける記入例（地番は隠さない）
-    c.setFont(body, 12)
-    c.setFillColor(DARK)
-    c.drawString(margin + 10, y - 52, "【記入例】")
-
-    # 簡易テーブル風の例（左に丸用の余白／右に説明用の余白）
     mark_w = 26
     note_w = 78
-    table_x = margin + 10 + mark_w
-    table_w = PAGE_W - 2 * margin - 20 - mark_w - note_w
-    col_w = [table_w * 0.36, table_w * 0.22, table_w * 0.18, table_w * 0.24]
-    headers = ["所在地", "地番", "地目", "面積"]
-    row1 = ["〇〇市△△町", "1234番", "山林", "2,500㎡"]
-    row2 = ["〇〇市△△町", "56番7", "原野", "800㎡"]
-
     header_h = 18
     row_h = 22
-    table_top = y - 58
+    n_rows = 2
+    table_h = header_h + row_h * n_rows
+
+    # 上余白 + 案内 + 案内下余白 + 記入例見出し + 見出し下 + 表 + 表下余白 + 注記 + 下余白
+    pad_top = 12
+    gap_after_guide = 22
+    example_label_h = 14
+    gap_after_label = 10
+    gap_after_table = 16
+    note_h = 12
+    pad_bottom = 14
+    box_h = (
+        pad_top
+        + guide_h
+        + gap_after_guide
+        + example_label_h
+        + gap_after_label
+        + table_h
+        + gap_after_table
+        + note_h
+        + pad_bottom
+    )
+
+    box_top = y
+    box_bottom = y - box_h
+    c.setStrokeColor(DARK)
+    c.setLineWidth(1.1)
+    c.setFillColor(colors.Color(1, 0.97, 0.97))
+    c.roundRect(margin, box_bottom, PAGE_W - 2 * margin, box_h, 2, stroke=1, fill=1)
+
+    cy = box_top - pad_top
+    _draw_wrapped_text(
+        c, guide, content_x, cy, content_w, body, 12, leading=guide_leading, color=DARK
+    )
+    cy = cy - guide_h - gap_after_guide
+
+    c.setFont(body, 12)
+    c.setFillColor(DARK)
+    c.drawString(content_x, cy, "【記入例】")
+    cy = cy - example_label_h - gap_after_label
+
+    table_x = content_x + mark_w
+    table_w = content_w - mark_w - note_w
+    col_w = [table_w * 0.36, table_w * 0.22, table_w * 0.18, table_w * 0.24]
+    headers = ["所在地", "地番", "地目", "面積"]
+    rows = [
+        ["〇〇市△△町", "1234番", "山林", "2,500㎡"],
+        ["〇〇市△△町", "56番7", "原野", "800㎡"],
+    ]
+    table_top = cy
+
     c.setFillColor(colors.Color(0.92, 0.92, 0.90))
     c.setStrokeColor(DARK)
     c.setLineWidth(0.9)
     c.rect(table_x, table_top - header_h, table_w, header_h, stroke=1, fill=1)
 
-    # 列区切り線（ヘッダー）
     hx = table_x
     c.setFont(body, 11)
     c.setFillColor(DARK)
@@ -581,7 +606,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         c.drawCentredString(hx + col_w[i] / 2, table_top - 13, h)
         hx += col_w[i]
 
-    for ri, row in enumerate([row1, row2]):
+    for ri, row in enumerate(rows):
         ry = table_top - header_h - (ri + 1) * row_h
         c.setFillColor(colors.white)
         c.setStrokeColor(DARK)
@@ -598,7 +623,6 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
             c.drawCentredString(cx + col_w[i] / 2, ry + 6, cell)
             cx += col_w[i]
 
-    # 1行目・所在地の左側に赤丸／説明は表の右側へ（文字の重なり防止）
     mark_cx = table_x - mark_w / 2
     mark_cy = table_top - header_h - row_h / 2
     c.setStrokeColor(RED)
@@ -608,16 +632,16 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     c.setFillColor(RED)
     c.drawString(table_x + table_w + 6, mark_cy - 3, "← 引き取り希望")
 
-    table_bottom = table_top - header_h - 2 * row_h
+    cy = table_top - table_h - gap_after_table
     c.setFont(body, 10)
     c.setFillColor(GRAY)
     c.drawString(
-        margin + 10,
-        table_bottom - 16,
+        content_x,
+        cy,
         "※ 上の例のように、引き取りを希望する土地の所在地の左側（または地番）に丸をつけてください。",
     )
 
-    y = y - box_h - 22
+    y = box_bottom - 22
 
     c.setFont(body, 15)
     c.setFillColor(DARK)
