@@ -518,7 +518,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     c.drawString(margin, y, "■　対象となる山林の指定")
     y -= 6
 
-    box_h = 56
+    box_h = 62
     c.setStrokeColor(DARK)
     c.setLineWidth(1)
     c.setFillColor(colors.Color(1, 0.97, 0.97))
@@ -529,7 +529,6 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         "引き取りをご希望される山林の行に【赤ペン等で丸（〇）】をつけてください。"
         "所在地・地番・地目が分かる箇所に印をつけていただけると助かります。"
     )
-    box_h = 62
     _draw_wrapped_text(
         c,
         guide,
