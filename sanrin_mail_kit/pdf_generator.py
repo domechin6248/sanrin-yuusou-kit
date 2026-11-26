@@ -547,9 +547,9 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     gap_after_guide = 22
     example_label_h = 14
     gap_after_label = 10
-    gap_after_table = 16
+    gap_after_table = 20
     note_h = 12
-    pad_bottom = 14
+    pad_bottom = 22
     box_h = (
         pad_top
         + guide_h
