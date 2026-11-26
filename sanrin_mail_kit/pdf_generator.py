@@ -532,7 +532,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
 
     guide = (
         "同封いただく固定資産の書類（課税明細書・名寄せ帳・公課証明書など）のコピーの中で、"
-        "引き取りをご希望される土地・物件の【地番】に赤ペン等で丸（〇）をつけてください。"
+        "引き取りをご希望される土地・物件の行（所在地の左側または地番）に赤ペン等で丸（〇）をつけてください。"
     )
     _draw_wrapped_text(
         c,
@@ -546,15 +546,16 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         color=DARK,
     )
 
-    # 地番に丸を付ける記入例
+    # 所在地の左側に丸を付ける記入例（地番は隠さない）
     ex_y = y - 58
     c.setFont(body, 12)
     c.setFillColor(DARK)
     c.drawString(margin + 10, ex_y + 18, "【記入例】")
 
-    # 簡易テーブル風の例
-    table_x = margin + 10
-    table_w = PAGE_W - 2 * margin - 20
+    # 簡易テーブル風の例（左に丸用の余白）
+    mark_w = 28
+    table_x = margin + 10 + mark_w
+    table_w = PAGE_W - 2 * margin - 20 - mark_w
     col_w = [table_w * 0.34, table_w * 0.22, table_w * 0.16, table_w * 0.28]
     headers = ["所在地", "地番", "地目", "面積"]
     row1 = ["〇〇市△△町", "1234番", "山林", "2,500㎡"]
@@ -586,22 +587,22 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
             c.drawCentredString(cx + col_w[i] / 2, ry + 6, cell)
             cx += col_w[i]
 
-    # 1行目の地番に赤丸＋「引き取り希望」ラベル
-    chipan_cx = table_x + col_w[0] + col_w[1] / 2
-    chipan_cy = table_top - header_h - row_h / 2
+    # 1行目・所在地の左側に赤丸＋「引き取り希望」ラベル
+    mark_cx = table_x - mark_w / 2
+    mark_cy = table_top - header_h - row_h / 2
     c.setStrokeColor(RED)
     c.setLineWidth(2.2)
-    c.circle(chipan_cx, chipan_cy, 14, stroke=1, fill=0)
-    c.setFont(body, 11)
+    c.circle(mark_cx, mark_cy, 11, stroke=1, fill=0)
+    c.setFont(body, 10)
     c.setFillColor(RED)
-    c.drawString(table_x + col_w[0] + col_w[1] + 4, chipan_cy + 16, "← 引き取り希望")
+    c.drawCentredString(mark_cx, mark_cy + row_h + 2, "引き取り希望")
 
     c.setFont(body, 10)
     c.setFillColor(GRAY)
     c.drawString(
         margin + 10,
         y - box_h + 8,
-        "※ 上の例のように、引き取りを希望する土地の地番に丸をつけてください。",
+        "※ 上の例のように、引き取りを希望する土地の所在地の左側（または地番）に丸をつけてください。",
     )
 
     y = y - box_h - 22
