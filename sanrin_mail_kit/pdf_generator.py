@@ -657,27 +657,28 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         ),
     ]
 
+    # 質問ブロックの高さを固定して間隔を揃える
+    title_to_opts = 22
+    block_h = 50
+    box = 15
     for q_title, options in questions:
         c.setFont(body, 14)
         c.setFillColor(DARK)
         c.drawString(margin, y, q_title)
-        y -= 20
+
+        opt_y = y - title_to_opts
         opt_x = margin + 8
         for opt in options:
-            box = 15
             c.setStrokeColor(DARK)
             c.setLineWidth(1.3)
             c.setFillColor(colors.white)
-            c.rect(opt_x, y - 2, box, box, stroke=1, fill=1)
+            c.rect(opt_x, opt_y - 2, box, box, stroke=1, fill=1)
             c.setFont(body, 13)
             c.setFillColor(DARK)
-            c.drawString(opt_x + box + 6, y, opt)
-            opt_w = pdfmetrics.stringWidth(opt, body, 13) + box + 20
-            opt_x += opt_w
-            if opt_x > PAGE_W - margin - 55 * mm:
-                opt_x = margin + 8
-                y -= 20
-        y -= 24
+            c.drawString(opt_x + box + 6, opt_y, opt)
+            opt_x += pdfmetrics.stringWidth(opt, body, 13) + box + 18
+
+        y -= block_h
 
     c.setFont(body, 15)
     c.setFillColor(DARK)
