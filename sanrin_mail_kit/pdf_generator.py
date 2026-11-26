@@ -533,7 +533,6 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     )
     guide_leading = 17
     guide_lines = _wrap_text(guide, body, 12, content_w)
-    guide_h = max(len(guide_lines) - 1, 0) * guide_leading + 12
 
     mark_w = 26
     note_w = 78
@@ -541,44 +540,34 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     row_h = 22
     n_rows = 2
     table_h = header_h + row_h * n_rows
+    pad_top = 14
+    gap_after_guide = 20
+    gap_label_to_table = 8
+    gap_table_to_note = 18
+    pad_bottom = 16
 
-    # 上余白 + 案内 + 案内下余白 + 記入例見出し + 見出し下 + 表 + 表下余白 + 注記 + 下余白
-    pad_top = 12
-    gap_after_guide = 22
-    example_label_h = 14
-    gap_after_label = 10
-    gap_after_table = 20
-    note_h = 12
-    pad_bottom = 22
-    box_h = (
-        pad_top
-        + guide_h
-        + gap_after_guide
-        + example_label_h
-        + gap_after_label
-        + table_h
-        + gap_after_table
-        + note_h
-        + pad_bottom
-    )
-
+    # まず各要素の Y を確定してから枠を描く（枠線との重なりを防ぐ）
     box_top = y
-    box_bottom = y - box_h
+    guide_y = box_top - pad_top
+    guide_bottom_y = guide_y - (len(guide_lines) - 1) * guide_leading
+    label_y = guide_bottom_y - gap_after_guide
+    table_top = label_y - 16 - gap_label_to_table
+    note_y = table_top - table_h - gap_table_to_note
+    box_bottom = note_y - pad_bottom
+    box_h = box_top - box_bottom
+
     c.setStrokeColor(DARK)
     c.setLineWidth(1.1)
     c.setFillColor(colors.Color(1, 0.97, 0.97))
     c.roundRect(margin, box_bottom, PAGE_W - 2 * margin, box_h, 2, stroke=1, fill=1)
 
-    cy = box_top - pad_top
     _draw_wrapped_text(
-        c, guide, content_x, cy, content_w, body, 12, leading=guide_leading, color=DARK
+        c, guide, content_x, guide_y, content_w, body, 12, leading=guide_leading, color=DARK
     )
-    cy = cy - guide_h - gap_after_guide
 
     c.setFont(body, 12)
     c.setFillColor(DARK)
-    c.drawString(content_x, cy, "【記入例】")
-    cy = cy - example_label_h - gap_after_label
+    c.drawString(content_x, label_y, "【記入例】")
 
     table_x = content_x + mark_w
     table_w = content_w - mark_w - note_w
@@ -588,7 +577,6 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         ["〇〇市△△町", "1234番", "山林", "2,500㎡"],
         ["〇〇市△△町", "56番7", "原野", "800㎡"],
     ]
-    table_top = cy
 
     c.setFillColor(colors.Color(0.92, 0.92, 0.90))
     c.setStrokeColor(DARK)
@@ -632,12 +620,11 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     c.setFillColor(RED)
     c.drawString(table_x + table_w + 6, mark_cy - 3, "← 引き取り希望")
 
-    cy = table_top - table_h - gap_after_table
     c.setFont(body, 10)
     c.setFillColor(GRAY)
     c.drawString(
         content_x,
-        cy,
+        note_y,
         "※ 上の例のように、引き取りを希望する土地の所在地の左側（または地番）に丸をつけてください。",
     )
 
