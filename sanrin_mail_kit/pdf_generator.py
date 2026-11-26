@@ -319,12 +319,22 @@ def _draw_emphasized(
 # ---------------------------------------------------------------------------
 # 同封書類 PDF（共通資料：お客様名・住所は印字しない）
 # ---------------------------------------------------------------------------
-def generate_common_documents_pdf(company: dict) -> bytes:
-    """送付状兼お手続きガイド + 簡易ヒアリングシート（共通・手書き欄あり）。"""
+def generate_common_documents_pdf(
+    company: dict,
+    *,
+    name_style: str = "kana",
+) -> bytes:
+    """
+    送付状兼お手続きガイド + 簡易ヒアリングシート（共通・手書き欄あり）。
+
+    name_style:
+      "kana"  — カタカナ宛名用（カタカナ表記のお詫びあり）
+      "kanji" — 漢字宛名用（お詫びなし）
+    """
     ensure_fonts()
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
-    _draw_cover_letter_common(c, company)
+    _draw_cover_letter_common(c, company, name_style=name_style)
     c.showPage()
     _draw_hearing_sheet_common(c, company)
     c.save()
@@ -333,14 +343,22 @@ def generate_common_documents_pdf(company: dict) -> bytes:
 
 def generate_documents_pdf(customer: dict, company: dict) -> bytes:
     """互換用。共通資料を返す（顧客名は印字しない）。"""
-    return generate_common_documents_pdf(company)
+    style = "kana" if (customer.get("name_kana") or "").strip() else "kanji"
+    return generate_common_documents_pdf(company, name_style=style)
 
 
-def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
+def _draw_cover_letter_common(
+    c: canvas.Canvas,
+    company: dict,
+    *,
+    name_style: str = "kana",
+) -> None:
     """共通の送付状。宛名・管理番号は空欄（手書き／ラベルで対応）。"""
     margin = 16 * mm
     y = PAGE_H - 16 * mm
     body = _font(True)
+    is_kana = name_style != "kanji"
+    style_label = "カタカナ宛名用" if is_kana else "漢字宛名用"
 
     c.setFont(body, 12)
     c.setFillColor(DARK)
@@ -388,14 +406,15 @@ def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
     y = _draw_wrapped_text(
         c, intro, margin, y, PAGE_W - 2 * margin, body, 13, leading=20
     )
-    y -= 18
-    apology = (
-        "なお、初回のお届けのため宛名がカタカナ表記となっておりますこと、"
-        "失礼のほどお詫び申し上げます。"
-    )
-    y = _draw_wrapped_text(
-        c, apology, margin, y, PAGE_W - 2 * margin, body, 12, leading=18, color=GRAY
-    )
+    if is_kana:
+        y -= 18
+        apology = (
+            "なお、初回のお届けのため宛名がカタカナ表記となっておりますこと、"
+            "失礼のほどお詫び申し上げます。"
+        )
+        y = _draw_wrapped_text(
+            c, apology, margin, y, PAGE_W - 2 * margin, body, 12, leading=18, color=GRAY
+        )
 
     y -= 28
     c.setFont(body, 15)
@@ -495,7 +514,7 @@ def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
     c.drawCentredString(
         PAGE_W / 2,
         12 * mm,
-        f"{company.get('company_name', '')}　｜　土地引き取りご相談 郵送キット（共通資料）",
+        f"{company.get('company_name', '')}　｜　郵送キット共通資料（{style_label}）",
     )
 
 
@@ -1112,7 +1131,8 @@ def generate_combined_pdf(
     ensure_fonts()
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
-    _draw_cover_letter_common(c, company)
+    style = "kana" if (customer.get("name_kana") or "").strip() else "kanji"
+    _draw_cover_letter_common(c, company, name_style=style)
     c.showPage()
     _draw_hearing_sheet_common(c, company)
     c.showPage()

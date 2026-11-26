@@ -205,14 +205,21 @@ def build_label_pdf(
     }
 
 
-def save_common_documents_to_desktop(company: dict[str, str]) -> Path:
-    """共通資料（氏名なし・太字）をデスクトップへ保存。"""
-    pdf = generate_common_documents_pdf(company)
+def save_common_documents_to_desktop(company: dict[str, str]) -> list[Path]:
+    """共通資料をカタカナ宛名用・漢字宛名用の2種類、デスクトップへ保存。"""
     DESKTOP_DIR.mkdir(parents=True, exist_ok=True)
-    path = DESKTOP_DIR / "山林パートナーズ_郵送キット_共通資料.pdf"
-    path.write_bytes(pdf)
-    (OUTPUT_DIR / path.name).write_bytes(pdf)
-    return path
+    variants = [
+        ("kana", "カタカナ宛名用"),
+        ("kanji", "漢字宛名用"),
+    ]
+    paths: list[Path] = []
+    for style, label in variants:
+        pdf = generate_common_documents_pdf(company, name_style=style)
+        path = DESKTOP_DIR / f"山林パートナーズ_郵送キット_共通資料_{label}.pdf"
+        path.write_bytes(pdf)
+        (OUTPUT_DIR / path.name).write_bytes(pdf)
+        paths.append(path)
+    return paths
 
 
 def render_download_buttons(key_prefix: str = "main") -> None:
@@ -311,11 +318,11 @@ with st.sidebar:
 
     st.divider()
     st.header("共通資料（同封文書）")
-    st.caption("氏名なしの共通PDF。デスクトップに保存します。")
-    if st.button("共通資料をデスクトップへ保存", use_container_width=True):
+    st.caption("カタカナ宛名用／漢字宛名用の2種類をデスクトップに保存します。")
+    if st.button("共通資料をデスクトップへ保存（2種類）", use_container_width=True):
         try:
-            path = save_common_documents_to_desktop(company_edited)
-            st.success(f"保存しました：\n{path}")
+            paths = save_common_documents_to_desktop(company_edited)
+            st.success("保存しました：\n" + "\n".join(str(p) for p in paths))
         except Exception as exc:  # noqa: BLE001
             st.error(f"保存に失敗しました: {exc}")
 
