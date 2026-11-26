@@ -492,7 +492,7 @@ def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
 
 
 def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
-    """共通ヒアリングシート。氏名・管理番号は手書き欄。"""
+    """共通ヒアリングシート。連絡先は下部の手書き欄。"""
     margin = 16 * mm
     y = PAGE_H - 16 * mm
     body = _font(True)
@@ -505,13 +505,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     c.setFillColor(DARK)
     c.drawCentredString(PAGE_W / 2, y, "土地引き取り　簡易ヒアリングシート")
 
-    y -= 44
-    c.setFont(body, 14)
-    c.drawString(margin, y, "お客様氏名：________________________________　様")
-    y -= 26
-    c.drawString(margin, y, "管理番号：____________________")
-
-    y -= 32
+    y -= 42
     c.setFont(body, 15)
     c.drawString(margin, y, "■　対象となる土地・物件の指定")
     y -= 8
@@ -539,12 +533,12 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         color=DARK,
     )
 
-    y = y - box_h - 28
+    y = y - box_h - 26
 
     c.setFont(body, 15)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　簡単なご質問（該当するものに ✓ をつけてください）")
-    y -= 28
+    y -= 26
 
     questions = [
         (
@@ -585,14 +579,14 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
             if opt_x > PAGE_W - margin - 55 * mm:
                 opt_x = margin + 8
                 y -= 22
-        y -= 30
+        y -= 28
 
     c.setFont(body, 15)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　自由記入欄・ご質問欄")
     y -= 10
 
-    free_h = 110
+    free_h = 72
     c.setStrokeColor(DARK)
     c.setLineWidth(1.1)
     c.setFillColor(colors.white)
@@ -605,6 +599,20 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
         c.line(margin + 4, line_y, PAGE_W - margin - 4, line_y)
         line_y -= 20
     c.setDash()
+
+    # 下部：ご連絡先（手書き）
+    y = y - free_h - 28
+    c.setFont(body, 15)
+    c.setFillColor(DARK)
+    c.drawString(margin, y, "■　ご連絡先（ご記入ください）")
+    y -= 30
+
+    c.setFont(body, 14)
+    c.drawString(margin, y, "お名前：________________________________　様")
+    y -= 28
+    c.drawString(margin, y, "ご住所：________________________________________________")
+    y -= 28
+    c.drawString(margin, y, "お電話番号：____________________")
 
     c.setFont(body, 11)
     c.setFillColor(GRAY)
