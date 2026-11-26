@@ -21,8 +21,7 @@ import pandas as pd
 import streamlit as st
 
 from pdf_generator import (
-    generate_combined_pdf,
-    generate_documents_pdf,
+    generate_common_documents_pdf,
     generate_labels_pdf,
     get_font_status,
 )
@@ -173,7 +172,10 @@ def safe_filename(text: str) -> str:
     return text.strip() or "noname"
 
 
-def build_pdfs(
+DESKTOP_DIR = Path.home() / "Desktop"
+
+
+def build_label_pdf(
     customer: dict[str, str],
     company: dict[str, str],
     *,
@@ -183,17 +185,8 @@ def build_pdfs(
     offset_y: float,
     show_guides: bool,
 ) -> dict[str, Any]:
-    docs_pdf = generate_documents_pdf(customer, company)
+    """封筒用宛名ラベルのみ生成する。"""
     labels_pdf = generate_labels_pdf(
-        customer,
-        company,
-        mode=label_mode,
-        layout=label_layout,
-        offset_x_mm=offset_x,
-        offset_y_mm=offset_y,
-        show_guides=show_guides,
-    )
-    combined_pdf = generate_combined_pdf(
         customer,
         company,
         mode=label_mode,
@@ -204,51 +197,37 @@ def build_pdfs(
     )
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     base_name = safe_filename(f"{customer['management_no']}_{customer['name']}")
-    (OUTPUT_DIR / f"{base_name}_同封書類_{stamp}.pdf").write_bytes(docs_pdf)
     (OUTPUT_DIR / f"{base_name}_宛名ラベル_{stamp}.pdf").write_bytes(labels_pdf)
-    (OUTPUT_DIR / f"{base_name}_一括_{stamp}.pdf").write_bytes(combined_pdf)
     return {
-        "docs": docs_pdf,
         "labels": labels_pdf,
-        "combined": combined_pdf,
         "base_name": base_name,
         "management_no": customer["management_no"],
     }
+
+
+def save_common_documents_to_desktop(company: dict[str, str]) -> Path:
+    """共通資料（氏名なし・太字）をデスクトップへ保存。"""
+    pdf = generate_common_documents_pdf(company)
+    DESKTOP_DIR.mkdir(parents=True, exist_ok=True)
+    path = DESKTOP_DIR / "山林パートナーズ_郵送キット_共通資料.pdf"
+    path.write_bytes(pdf)
+    (OUTPUT_DIR / path.name).write_bytes(pdf)
+    return path
 
 
 def render_download_buttons(key_prefix: str = "main") -> None:
     if "last_pdfs" not in st.session_state:
         return
     pdfs = st.session_state["last_pdfs"]
-    st.subheader("ダウンロード")
-    d1, d2, d3 = st.columns(3)
-    with d1:
-        st.download_button(
-            "【普通紙用】同封書類PDF",
-            data=pdfs["docs"],
-            file_name=f"{pdfs['base_name']}_同封書類.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            key=f"{key_prefix}_dl_docs",
-        )
-    with d2:
-        st.download_button(
-            "【シール用紙用】宛名ラベルPDF",
-            data=pdfs["labels"],
-            file_name=f"{pdfs['base_name']}_宛名ラベル.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            key=f"{key_prefix}_dl_labels",
-        )
-    with d3:
-        st.download_button(
-            "【確認用】全ページ一括PDF",
-            data=pdfs["combined"],
-            file_name=f"{pdfs['base_name']}_一括.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            key=f"{key_prefix}_dl_combined",
-        )
+    st.subheader("ダウンロード（封筒用宛名ラベル）")
+    st.download_button(
+        "【長3封筒用】宛名ラベルPDF",
+        data=pdfs["labels"],
+        file_name=f"{pdfs['base_name']}_宛名ラベル.pdf",
+        mime="application/pdf",
+        use_container_width=True,
+        key=f"{key_prefix}_dl_labels",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -300,8 +279,9 @@ if not require_login():
 st.title("🌲 山林パートナーズ　郵送キット自動生成")
 st.caption(
     "合同会社山林パートナーズ｜不要山林の有料引き取り事業｜"
-    "同封書類・宛名ラベル PDF 生成（独立アプリ / ポート 8510 推奨）｜長3封筒対応"
+    "封筒用宛名ラベル生成｜同封文書は共通資料（デスクトップへ保存）｜ポート 8510"
 )
+
 
 
 # --- サイドバー：自社情報・フォント・印刷設定 ---
@@ -328,6 +308,16 @@ with st.sidebar:
     if st.button("自社情報を保存", use_container_width=True):
         save_company_info(company_edited)
         st.success("data/company_info.json に保存しました")
+
+    st.divider()
+    st.header("共通資料（同封文書）")
+    st.caption("氏名なしの共通PDF。デスクトップに保存します。")
+    if st.button("共通資料をデスクトップへ保存", use_container_width=True):
+        try:
+            path = save_common_documents_to_desktop(company_edited)
+            st.success(f"保存しました：\n{path}")
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"保存に失敗しました: {exc}")
 
     st.divider()
     st.header("宛名ラベル印刷設定")
@@ -496,7 +486,7 @@ with tab_sheets:
                     st.success("② 単件作成タブに読み込みました。")
             with b2:
                 if st.button(
-                    "この内容で PDF を生成する",
+                    "この内容で宛名ラベルを生成する",
                     type="primary",
                     use_container_width=True,
                 ):
@@ -518,7 +508,7 @@ with tab_sheets:
                     else:
                         append_history(customer)
                         save_company_info(company_edited)
-                        st.session_state["last_pdfs"] = build_pdfs(
+                        st.session_state["last_pdfs"] = build_label_pdf(
                             customer,
                             company_edited,
                             label_mode=label_mode,
@@ -528,7 +518,7 @@ with tab_sheets:
                             show_guides=show_guides,
                         )
                         st.success(
-                            f"PDFを生成しました（{customer['management_no']}）。"
+                            f"宛名ラベルを生成しました（{customer['management_no']}）。"
                         )
                         # 対応状況を書き戻し
                         sheet_row = selected_row.get("sheet_row", "")
@@ -643,7 +633,7 @@ with tab_single:
     gen_col1, gen_col2, gen_col3 = st.columns([1, 1, 1])
     with gen_col1:
         do_generate = st.button(
-            "📄 PDFを生成する", type="primary", use_container_width=True
+            "📄 宛名ラベルを生成する", type="primary", use_container_width=True
         )
     with gen_col2:
         save_only = st.button("履歴に保存のみ", use_container_width=True)
@@ -686,7 +676,7 @@ with tab_single:
             if save_only and not do_generate:
                 st.success(f"履歴に保存しました（管理番号：{management_no}）")
             else:
-                st.session_state["last_pdfs"] = build_pdfs(
+                st.session_state["last_pdfs"] = build_label_pdf(
                     customer,
                     company_edited,
                     label_mode=label_mode,
@@ -708,8 +698,8 @@ with tab_single:
                     except Exception as exc:  # noqa: BLE001
                         st.warning(f"対応状況の書き戻しに失敗しました: {exc}")
                 st.success(
-                    f"PDFを生成しました（管理番号：{management_no}）。"
-                    f"output/ にも保存済みです。"
+                    f"宛名ラベルを生成しました（管理番号：{management_no}）。"
+                    f"同封文書はサイドバーから共通資料をデスクトップへ保存してください。"
                 )
 
     render_download_buttons("single")
@@ -761,7 +751,7 @@ with tab_history:
                 forest_location=row.get("forest_location", ""),
                 notes=row.get("notes", ""),
             )
-            st.session_state["last_pdfs"] = build_pdfs(
+            st.session_state["last_pdfs"] = build_label_pdf(
                 customer,
                 company_edited,
                 label_mode=label_mode,
@@ -871,7 +861,7 @@ CSV の列名（ヘッダー）は以下を想定しています。
                             notes=str(row_dict.get("notes", "")),
                         )
                         append_history(customer)
-                        pdfs = build_pdfs(
+                        pdfs = build_label_pdf(
                             customer,
                             company_edited,
                             label_mode=label_mode,
@@ -880,10 +870,7 @@ CSV の列名（ヘッダー）は以下を想定しています。
                             offset_y=offset_y,
                             show_guides=show_guides,
                         )
-                        base = pdfs["base_name"]
-                        zf.writestr(f"{base}_同封書類.pdf", pdfs["docs"])
-                        zf.writestr(f"{base}_宛名ラベル.pdf", pdfs["labels"])
-                        zf.writestr(f"{base}_一括.pdf", pdfs["combined"])
+                        zf.writestr(f"{pdfs['base_name']}_宛名ラベル.pdf", pdfs["labels"])
                         ok_count += 1
 
                 zip_buf.seek(0)

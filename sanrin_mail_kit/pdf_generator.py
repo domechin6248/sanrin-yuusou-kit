@@ -45,7 +45,6 @@ def _candidate_font_paths() -> list[tuple[Path, Path | None]]:
     # 1) アプリ同梱 fonts/
     local_regular = [
         FONTS_DIR / "NotoSansJP-Regular.ttf",
-        FONTS_DIR / "NotoSansJP-Bold.ttf",
         FONTS_DIR / "NotoSansCJKjp-Regular.otf",
         FONTS_DIR / "ipaexg.ttf",
         FONTS_DIR / "IPAexGothic.ttf",
@@ -54,12 +53,10 @@ def _candidate_font_paths() -> list[tuple[Path, Path | None]]:
     ]
     local_bold = [
         FONTS_DIR / "NotoSansJP-Bold.ttf",
-        FONTS_DIR / "NotoSansJP-Regular.ttf",  # 可変フォント1本の場合のフォールバック
         FONTS_DIR / "NotoSansCJKjp-Bold.otf",
-        FONTS_DIR / "ipaexg.ttf",
-        FONTS_DIR / "IPAexGothic.ttf",
         FONTS_DIR / "GenShinGothic-Bold.ttf",
         FONTS_DIR / "SourceHanSans-Bold.otf",
+        FONTS_DIR / "NotoSansJP-Regular.ttf",  # 太字ファイルが無い場合のフォールバック
     ]
     for reg in local_regular:
         if reg.exists():
@@ -320,36 +317,42 @@ def _draw_emphasized(
 
 
 # ---------------------------------------------------------------------------
-# 同封書類 PDF（送付状 + ヒアリングシート）
+# 同封書類 PDF（共通資料：お客様名・住所は印字しない）
 # ---------------------------------------------------------------------------
-def generate_documents_pdf(customer: dict, company: dict) -> bytes:
-    """送付状兼お手続きガイド + 簡易ヒアリングシート の 2 ページ PDF。"""
+def generate_common_documents_pdf(company: dict) -> bytes:
+    """送付状兼お手続きガイド + 簡易ヒアリングシート（共通・手書き欄あり）。"""
     ensure_fonts()
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
-    _draw_cover_letter(c, customer, company)
+    _draw_cover_letter_common(c, company)
     c.showPage()
-    _draw_hearing_sheet(c, customer, company)
+    _draw_hearing_sheet_common(c, company)
     c.save()
     return buf.getvalue()
 
 
-def _draw_cover_letter(c: canvas.Canvas, customer: dict, company: dict) -> None:
+def generate_documents_pdf(customer: dict, company: dict) -> bytes:
+    """互換用。共通資料を返す（顧客名は印字しない）。"""
+    return generate_common_documents_pdf(company)
+
+
+def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
+    """共通の送付状。宛名・管理番号は空欄（手書き／ラベルで対応）。"""
     margin = 18 * mm
     y = PAGE_H - 18 * mm
+    body = _font(True)  # 本文も太字
 
-    # ヘッダー：自社情報（右寄せ）
-    c.setFont(_font(True), 10)
+    c.setFont(body, 11)
     c.setFillColor(DARK)
     c.drawRightString(PAGE_W - margin, y, company.get("company_name", ""))
-    y -= 14
-    c.setFont(_font(), 9)
+    y -= 15
+    c.setFont(body, 10)
     c.drawRightString(
         PAGE_W - margin,
         y,
         f"〒{company.get('postal_code', '')}  {company.get('address', '')}",
     )
-    y -= 12
+    y -= 13
     phone = company.get("phone", "")
     dept = company.get("department", "")
     contact = company.get("contact_person", "")
@@ -357,54 +360,27 @@ def _draw_cover_letter(c: canvas.Canvas, customer: dict, company: dict) -> None:
     if right_line:
         c.drawRightString(PAGE_W - margin, y, right_line)
 
-    # 区切り線
     y -= 10
     c.setStrokeColor(DARK)
     c.setLineWidth(1.5)
     c.line(margin, y, PAGE_W - margin, y)
 
-    # 日付・管理番号
-    y -= 22
-    c.setFont(_font(), 11)
+    # 宛名は空欄（封筒ラベルで対応）
+    y -= 26
+    c.setFont(body, 12)
     c.setFillColor(DARK)
-    date_str = customer.get("reception_date", "")
-    mgmt = customer.get("management_no", "")
-    c.drawString(margin, y, f"日付：{date_str}")
-    if mgmt:
-        c.drawRightString(PAGE_W - margin, y, f"管理番号：{mgmt}")
+    c.drawString(margin, y, "お客様　各位")
 
-    # 宛名
-    y -= 28
-    c.setFont(_font(), 11)
-    postal = customer.get("postal_code", "")
-    if postal:
-        c.setFont(_font(True), 12)
-        c.drawString(margin, y, f"〒 {postal}")
-        y -= 16
-    addr = customer.get("address", "")
-    if addr:
-        y = _draw_wrapped_text(
-            c, addr, margin, y, PAGE_W - 2 * margin - 40 * mm, _font(), 11
-        )
-        y -= 16
-    name = customer.get("name", "")
-    honorific = customer.get("honorific", "様")
-    c.setFont(_font(True), 16)
-    c.setFillColor(DARK)
-    c.drawString(margin, y, f"{name}　{honorific}")
-
-    # タイトル
-    y -= 36
+    y -= 32
     c.setStrokeColor(DARK)
     c.setFillColor(colors.Color(0.95, 0.95, 0.93))
     title_h = 28
     c.roundRect(margin, y - 6, PAGE_W - 2 * margin, title_h, 3, stroke=1, fill=1)
-    c.setFont(_font(True), 15)
+    c.setFont(body, 16)
     c.setFillColor(DARK)
     c.drawCentredString(PAGE_W / 2, y + 2, "山林引き取りご相談　郵送お手続きのご案内")
 
-    # 導入文
-    y -= 30
+    y -= 32
     intro = (
         "このたびは山林の引き取りについてお問い合わせいただき、誠にありがとうございます。"
         "ご高齢のお客様やパソコン操作がご不安なお客様にも安心してご利用いただけるよう、"
@@ -412,20 +388,19 @@ def _draw_cover_letter(c: canvas.Canvas, customer: dict, company: dict) -> None:
         "下記をご確認のうえ、同封の返信用封筒でご返送ください。"
     )
     y = _draw_wrapped_text(
-        c, intro, margin, y, PAGE_W - 2 * margin, _font(), 10.5, leading=15
+        c, intro, margin, y, PAGE_W - 2 * margin, body, 12, leading=17
     )
 
-    # ご返送いただきたいもの
     y -= 28
-    c.setFont(_font(True), 13)
+    c.setFont(body, 14)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　ご返送いただきたいもの")
     y -= 8
     c.setStrokeColor(DARK)
-    c.setLineWidth(0.8)
+    c.setLineWidth(1.0)
     c.line(margin, y, PAGE_W - margin, y)
 
-    y -= 22
+    y -= 24
     items = [
         (
             "固定資産税の納税通知書・課税明細書のコピー",
@@ -442,150 +417,102 @@ def _draw_cover_letter(c: canvas.Canvas, customer: dict, company: dict) -> None:
     ]
     content_w = PAGE_W - 2 * margin - 20
     for label, emphasis in items:
-        # チェックボックス
-        box = 14
+        box = 15
         c.setStrokeColor(DARK)
-        c.setLineWidth(1.3)
+        c.setLineWidth(1.4)
         c.setFillColor(colors.white)
         c.rect(margin, y - 3, box, box, stroke=1, fill=1)
 
         text_x = margin + box + 8
         y = _draw_wrapped_text(
-            c, label, text_x, y + 2, content_w - box, _font(), 11, leading=15
+            c, label, text_x, y + 2, content_w - box, body, 12, leading=16
         )
         if emphasis:
-            y -= 14
-            y = _draw_emphasized(c, emphasis, text_x, y, content_w - box, font_size=10.5)
+            y -= 15
+            y = _draw_emphasized(c, emphasis, text_x, y, content_w - box, font_size=11.5)
         y -= 20
 
-    # 今後の流れ
     y -= 8
-    c.setFont(_font(True), 13)
+    c.setFont(body, 14)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　今後の流れ")
     y -= 8
     c.setStrokeColor(DARK)
-    c.setLineWidth(0.8)
+    c.setLineWidth(1.0)
     c.line(margin, y, PAGE_W - margin, y)
 
-    y -= 20
+    y -= 22
     flow = (
         "書類が弊社に到着してから、原則として1週間以内に、"
         "内容を確認のうえお見積り・今後のご案内をご連絡いたします。"
         "ご不明な点がございましたら、お気軽にお電話ください。"
     )
-    y = _draw_wrapped_text(
-        c, flow, margin, y, PAGE_W - 2 * margin, _font(), 11, leading=16
+    _draw_wrapped_text(
+        c, flow, margin, y, PAGE_W - 2 * margin, body, 12, leading=17
     )
 
-    # 備考
-    notes = customer.get("notes", "").strip()
-    if notes:
-        y -= 24
-        c.setFont(_font(True), 11)
-        c.drawString(margin, y, "【備考】")
-        y -= 14
-        _draw_wrapped_text(
-            c, notes, margin, y, PAGE_W - 2 * margin, _font(), 10, leading=14
-        )
-
-    # フッター
-    c.setFont(_font(), 8)
+    c.setFont(body, 9)
     c.setFillColor(GRAY)
     c.drawCentredString(
         PAGE_W / 2,
         12 * mm,
-        f"{company.get('company_name', '')}　｜　山林引き取りご相談 郵送キット",
+        f"{company.get('company_name', '')}　｜　山林引き取りご相談 郵送キット（共通資料）",
     )
 
 
-def _draw_hearing_sheet(c: canvas.Canvas, customer: dict, company: dict) -> None:
+def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
+    """共通ヒアリングシート。氏名・管理番号は手書き欄。"""
     margin = 18 * mm
     y = PAGE_H - 18 * mm
+    body = _font(True)
 
-    # タイトル
     c.setFillColor(colors.Color(0.95, 0.95, 0.93))
     c.setStrokeColor(DARK)
     c.setLineWidth(1.2)
     c.roundRect(margin, y - 8, PAGE_W - 2 * margin, 30, 3, stroke=1, fill=1)
-    c.setFont(_font(True), 15)
+    c.setFont(body, 16)
     c.setFillColor(DARK)
     c.drawCentredString(PAGE_W / 2, y, "山林引き取り　簡易ヒアリングシート")
 
     y -= 40
-    # 事前印字：氏名・管理番号
-    c.setFont(_font(), 11)
-    name = customer.get("name", "")
-    honorific = customer.get("honorific", "様")
-    mgmt = customer.get("management_no", "")
-    c.drawString(margin, y, f"お客様氏名：{name}　{honorific}")
-    if mgmt:
-        c.drawRightString(PAGE_W - margin, y, f"管理番号：{mgmt}")
+    # 手書き用の空欄
+    c.setFont(body, 12)
+    c.drawString(margin, y, "お客様氏名：________________________　様")
+    c.drawRightString(PAGE_W - margin, y, "管理番号：______________")
 
-    y -= 16
-    phone = customer.get("phone", "")
-    if phone:
-        c.setFont(_font(), 10)
-        c.drawString(margin, y, f"電話番号：{phone}")
-        y -= 14
-
-    # 対象山林の指定
-    y -= 8
-    c.setFont(_font(True), 12)
-    c.setFillColor(DARK)
+    y -= 28
+    c.setFont(body, 13)
     c.drawString(margin, y, "■　対象となる山林の指定")
     y -= 6
 
-    box_h = 52
-    forest_loc = customer.get("forest_location", "").strip()
-    if forest_loc:
-        box_h = 68
-
+    box_h = 56
     c.setStrokeColor(DARK)
     c.setLineWidth(1)
     c.setFillColor(colors.Color(1, 0.97, 0.97))
     c.roundRect(margin, y - box_h, PAGE_W - 2 * margin, box_h, 2, stroke=1, fill=1)
 
-    inner_y = y - 14
     guide = (
         "同封いただく『課税明細書』のコピーの中で、"
         "引き取りをご希望される山林の行に【赤ペン等で丸（〇）】をつけてください。"
     )
-    inner_y = _draw_wrapped_text(
+    _draw_wrapped_text(
         c,
         guide,
         margin + 8,
-        inner_y,
+        y - 16,
         PAGE_W - 2 * margin - 16,
-        _font(),
-        10.5,
-        leading=14,
+        body,
+        12,
+        leading=16,
         color=DARK,
     )
-    if forest_loc:
-        inner_y -= 16
-        c.setFont(_font(True), 10)
-        c.setFillColor(DARK)
-        c.drawString(margin + 8, inner_y, "事前にお伺いした所在地：")
-        inner_y -= 14
-        _draw_wrapped_text(
-            c,
-            forest_loc,
-            margin + 8,
-            inner_y,
-            PAGE_W - 2 * margin - 16,
-            _font(),
-            10.5,
-            color=DARK,
-        )
 
-    y = y - box_h - 20
+    y = y - box_h - 22
 
-    # 質問セクション
-    c.setFont(_font(True), 12)
+    c.setFont(body, 13)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　簡単なご質問（該当するものに ✓ をつけてください）")
-    y -= 20
+    y -= 22
 
     questions = [
         (
@@ -607,41 +534,38 @@ def _draw_hearing_sheet(c: canvas.Canvas, customer: dict, company: dict) -> None
     ]
 
     for q_title, options in questions:
-        c.setFont(_font(True), 11)
+        c.setFont(body, 12)
         c.setFillColor(DARK)
         c.drawString(margin, y, q_title)
         y -= 18
         opt_x = margin + 8
         for opt in options:
-            box = 12
+            box = 13
             c.setStrokeColor(DARK)
-            c.setLineWidth(1.1)
+            c.setLineWidth(1.2)
             c.setFillColor(colors.white)
             c.rect(opt_x, y - 2, box, box, stroke=1, fill=1)
-            c.setFont(_font(), 10.5)
+            c.setFont(body, 11.5)
             c.setFillColor(DARK)
             c.drawString(opt_x + box + 5, y, opt)
-            opt_w = pdfmetrics.stringWidth(opt, _font(), 10.5) + box + 18
+            opt_w = pdfmetrics.stringWidth(opt, body, 11.5) + box + 18
             opt_x += opt_w
             if opt_x > PAGE_W - margin - 50 * mm:
                 opt_x = margin + 8
                 y -= 18
-        y -= 22
+        y -= 24
 
-    # 自由記入欄
-    c.setFont(_font(True), 12)
+    c.setFont(body, 13)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　自由記入欄・ご質問欄")
     y -= 8
 
-    notes = customer.get("notes", "").strip()
-    free_h = 90
+    free_h = 95
     c.setStrokeColor(DARK)
-    c.setLineWidth(0.9)
+    c.setLineWidth(1.0)
     c.setFillColor(colors.white)
     c.rect(margin, y - free_h, PAGE_W - 2 * margin, free_h, stroke=1, fill=1)
 
-    # 点線ガイド
     c.setStrokeColor(LIGHT_GRAY)
     c.setDash(2, 3)
     line_y = y - 18
@@ -650,20 +574,7 @@ def _draw_hearing_sheet(c: canvas.Canvas, customer: dict, company: dict) -> None
         line_y -= 16
     c.setDash()
 
-    if notes:
-        _draw_wrapped_text(
-            c,
-            f"（備考）{notes}",
-            margin + 6,
-            y - 14,
-            PAGE_W - 2 * margin - 12,
-            _font(),
-            9,
-            color=GRAY,
-        )
-
-    # フッター
-    c.setFont(_font(), 8)
+    c.setFont(body, 9)
     c.setFillColor(GRAY)
     c.drawCentredString(
         PAGE_W / 2,
@@ -1034,9 +945,9 @@ def generate_combined_pdf(
     ensure_fonts()
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
-    _draw_cover_letter(c, customer, company)
+    _draw_cover_letter_common(c, company)
     c.showPage()
-    _draw_hearing_sheet(c, customer, company)
+    _draw_hearing_sheet_common(c, company)
     c.showPage()
     ox = offset_x_mm * mm
     oy = offset_y_mm * mm
