@@ -338,21 +338,21 @@ def generate_documents_pdf(customer: dict, company: dict) -> bytes:
 
 def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
     """共通の送付状。宛名・管理番号は空欄（手書き／ラベルで対応）。"""
-    margin = 18 * mm
-    y = PAGE_H - 18 * mm
-    body = _font(True)  # 本文も太字
+    margin = 16 * mm
+    y = PAGE_H - 16 * mm
+    body = _font(True)
 
-    c.setFont(body, 11)
+    c.setFont(body, 12)
     c.setFillColor(DARK)
     c.drawRightString(PAGE_W - margin, y, company.get("company_name", ""))
-    y -= 15
-    c.setFont(body, 10)
+    y -= 16
+    c.setFont(body, 11)
     c.drawRightString(
         PAGE_W - margin,
         y,
         f"〒{company.get('postal_code', '')}  {company.get('address', '')}",
     )
-    y -= 13
+    y -= 14
     phone = company.get("phone", "")
     dept = company.get("department", "")
     contact = company.get("contact_person", "")
@@ -360,69 +360,67 @@ def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
     if right_line:
         c.drawRightString(PAGE_W - margin, y, right_line)
 
-    y -= 10
+    y -= 12
     c.setStrokeColor(DARK)
     c.setLineWidth(1.5)
     c.line(margin, y, PAGE_W - margin, y)
 
-    # 宛名は空欄（封筒ラベルで対応）
-    y -= 26
-    c.setFont(body, 12)
+    y -= 28
+    c.setFont(body, 14)
     c.setFillColor(DARK)
     c.drawString(margin, y, "お客様　各位")
 
-    y -= 32
+    y -= 34
     c.setStrokeColor(DARK)
     c.setFillColor(colors.Color(0.95, 0.95, 0.93))
-    title_h = 28
+    title_h = 32
     c.roundRect(margin, y - 6, PAGE_W - 2 * margin, title_h, 3, stroke=1, fill=1)
-    c.setFont(body, 16)
+    c.setFont(body, 17)
     c.setFillColor(DARK)
-    c.drawCentredString(PAGE_W / 2, y + 2, "山林引き取りご相談　郵送お手続きのご案内")
+    c.drawCentredString(PAGE_W / 2, y + 4, "土地引き取りご相談　郵送お手続きのご案内")
 
-    y -= 28
+    y -= 36
     intro = (
-        "このたびは山林の引き取りについてお問い合わせいただき、誠にありがとうございます。"
+        "このたびは土地の引き取りについてお問い合わせいただき、誠にありがとうございます。"
         "パソコン操作がご不安な方も安心してご利用いただけるよう、郵送キットをお届けしました。"
         "下記をご確認のうえ、同封の返信用封筒でご返送ください。"
     )
     y = _draw_wrapped_text(
-        c, intro, margin, y, PAGE_W - 2 * margin, body, 11.5, leading=16
+        c, intro, margin, y, PAGE_W - 2 * margin, body, 13, leading=20
     )
 
-    y -= 22
-    c.setFont(body, 14)
+    y -= 28
+    c.setFont(body, 15)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　ご返送いただきたいもの")
-    y -= 8
+    y -= 10
     c.setStrokeColor(DARK)
-    c.setLineWidth(1.0)
+    c.setLineWidth(1.2)
     c.line(margin, y, PAGE_W - margin, y)
 
-    y -= 18
-    # 補足枠（素人向け）
+    y -= 20
     tip = (
-        "【ひとこと】　「どの山林を引き取りたいか」が分かる書類のコピーが必要です。"
+        "【ひとこと】　「どの土地・物件を引き取りたいか」が分かる書類のコピーが必要です。"
         "市区町村から届く固定資産税の書類や、市役所・町村役場で取得できる証明書などです。"
-        "お手元の名前が違っても構いません。どれか1種類で大丈夫です。"
+        "お手元の書類の名前が違っても構いません。どれか1種類で大丈夫です。"
     )
-    tip_h = 48
+    tip_h = 58
     c.setFillColor(colors.Color(0.96, 0.98, 1.0))
     c.setStrokeColor(DARK)
-    c.setLineWidth(0.8)
+    c.setLineWidth(0.9)
     c.roundRect(margin, y - tip_h, PAGE_W - 2 * margin, tip_h, 2, stroke=1, fill=1)
     _draw_wrapped_text(
-        c, tip, margin + 6, y - 12, PAGE_W - 2 * margin - 12, body, 10.5, leading=14
+        c, tip, margin + 8, y - 14, PAGE_W - 2 * margin - 16, body, 12, leading=18
     )
-    y -= tip_h + 16
+    y -= tip_h + 22
 
     items = [
         (
-            "①　山林の内容が分かる書類のコピー（どれか1つでOK）",
+            "①　土地・物件の内容が分かる書類のコピー（どれか1つでOK）",
             (
                 "例）固定資産税の納税通知書・課税明細書／名寄せ帳（固定資産課税台帳の写し）／"
                 "固定資産公課証明書／評価証明書 など。"
-                "所在地・地番・地目（山林・原野など）・面積が載っているページをコピーしてください。"
+                "所在地・地番・地目（山林・原野・畑・宅地など）・面積が載っているページをコピーしてください。"
                 "※ 原本は送らず、必ずコピーをお送りください。"
             ),
         ),
@@ -434,24 +432,24 @@ def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
             ),
         ),
         (
-            "③　同封の「山林引き取り　簡易ヒアリングシート」（ご記入のうえ）",
+            "③　同封の「土地引き取り　簡易ヒアリングシート」（ご記入のうえ）",
             None,
         ),
     ]
-    content_w = PAGE_W - 2 * margin - 20
+    content_w = PAGE_W - 2 * margin - 22
     for label, emphasis in items:
-        box = 14
+        box = 16
         c.setStrokeColor(DARK)
-        c.setLineWidth(1.4)
+        c.setLineWidth(1.5)
         c.setFillColor(colors.white)
         c.rect(margin, y - 2, box, box, stroke=1, fill=1)
 
-        text_x = margin + box + 8
+        text_x = margin + box + 10
         y = _draw_wrapped_text(
-            c, label, text_x, y + 1, content_w - box, body, 11.5, leading=15
+            c, label, text_x, y + 2, content_w - box, body, 13.5, leading=19
         )
         if emphasis:
-            y -= 12
+            y -= 16
             y = _draw_wrapped_text(
                 c,
                 emphasis,
@@ -459,94 +457,93 @@ def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
                 y,
                 content_w - box,
                 body,
-                10,
-                leading=13.5,
+                12,
+                leading=18,
                 color=RED if "※" in emphasis else DARK,
             )
-        y -= 14
+        y -= 22
 
-    y -= 6
-    c.setFont(body, 13)
+    y -= 10
+    c.setFont(body, 15)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　今後の流れ")
-    y -= 7
+    y -= 10
     c.setStrokeColor(DARK)
-    c.setLineWidth(1.0)
+    c.setLineWidth(1.2)
     c.line(margin, y, PAGE_W - margin, y)
 
-    y -= 18
+    y -= 22
     flow = (
         "書類が弊社に到着してから、原則として1週間以内に、"
         "内容を確認のうえお見積り・今後のご案内をご連絡いたします。"
         "どの書類を送ればよいか迷われた場合も、お気軽にお電話ください。"
     )
     _draw_wrapped_text(
-        c, flow, margin, y, PAGE_W - 2 * margin, body, 11.5, leading=16
+        c, flow, margin, y, PAGE_W - 2 * margin, body, 13, leading=20
     )
 
-    c.setFont(body, 9)
+    c.setFont(body, 10)
     c.setFillColor(GRAY)
     c.drawCentredString(
         PAGE_W / 2,
         12 * mm,
-        f"{company.get('company_name', '')}　｜　山林引き取りご相談 郵送キット（共通資料）",
+        f"{company.get('company_name', '')}　｜　土地引き取りご相談 郵送キット（共通資料）",
     )
 
 
 def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     """共通ヒアリングシート。氏名・管理番号は手書き欄。"""
-    margin = 18 * mm
-    y = PAGE_H - 18 * mm
+    margin = 16 * mm
+    y = PAGE_H - 16 * mm
     body = _font(True)
 
     c.setFillColor(colors.Color(0.95, 0.95, 0.93))
     c.setStrokeColor(DARK)
-    c.setLineWidth(1.2)
-    c.roundRect(margin, y - 8, PAGE_W - 2 * margin, 30, 3, stroke=1, fill=1)
-    c.setFont(body, 16)
+    c.setLineWidth(1.3)
+    c.roundRect(margin, y - 8, PAGE_W - 2 * margin, 34, 3, stroke=1, fill=1)
+    c.setFont(body, 17)
     c.setFillColor(DARK)
-    c.drawCentredString(PAGE_W / 2, y, "山林引き取り　簡易ヒアリングシート")
+    c.drawCentredString(PAGE_W / 2, y, "土地引き取り　簡易ヒアリングシート")
 
-    y -= 40
-    # 手書き用の空欄
-    c.setFont(body, 12)
-    c.drawString(margin, y, "お客様氏名：________________________　様")
-    c.drawRightString(PAGE_W - margin, y, "管理番号：______________")
+    y -= 44
+    c.setFont(body, 14)
+    c.drawString(margin, y, "お客様氏名：____________________________　様")
+    c.drawRightString(PAGE_W - margin, y, "管理番号：________________")
 
-    y -= 28
-    c.setFont(body, 13)
-    c.drawString(margin, y, "■　対象となる山林の指定")
-    y -= 6
+    y -= 34
+    c.setFont(body, 15)
+    c.drawString(margin, y, "■　対象となる土地・物件の指定")
+    y -= 8
 
-    box_h = 62
+    box_h = 78
     c.setStrokeColor(DARK)
-    c.setLineWidth(1)
+    c.setLineWidth(1.1)
     c.setFillColor(colors.Color(1, 0.97, 0.97))
     c.roundRect(margin, y - box_h, PAGE_W - 2 * margin, box_h, 2, stroke=1, fill=1)
 
     guide = (
         "同封いただく固定資産の書類（課税明細書・名寄せ帳・公課証明書など）のコピーの中で、"
-        "引き取りをご希望される山林の行に【赤ペン等で丸（〇）】をつけてください。"
+        "引き取りをご希望される土地・物件の行に【赤ペン等で丸（〇）】をつけてください。"
         "所在地・地番・地目が分かる箇所に印をつけていただけると助かります。"
     )
     _draw_wrapped_text(
         c,
         guide,
-        margin + 8,
-        y - 16,
-        PAGE_W - 2 * margin - 16,
+        margin + 10,
+        y - 18,
+        PAGE_W - 2 * margin - 20,
         body,
-        12,
-        leading=16,
+        13,
+        leading=19,
         color=DARK,
     )
 
-    y = y - box_h - 22
+    y = y - box_h - 28
 
-    c.setFont(body, 13)
+    c.setFont(body, 15)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　簡単なご質問（該当するものに ✓ をつけてください）")
-    y -= 22
+    y -= 28
 
     questions = [
         (
@@ -558,7 +555,7 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
             ["だいたい分かる", "全く分からない"],
         ),
         (
-            "３．山林の状態",
+            "３．土地・物件の状態",
             ["建物・工作物なし", "建物・小屋あり", "不明"],
         ),
         (
@@ -568,47 +565,47 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     ]
 
     for q_title, options in questions:
-        c.setFont(body, 12)
+        c.setFont(body, 14)
         c.setFillColor(DARK)
         c.drawString(margin, y, q_title)
-        y -= 18
+        y -= 22
         opt_x = margin + 8
         for opt in options:
-            box = 13
+            box = 15
             c.setStrokeColor(DARK)
-            c.setLineWidth(1.2)
+            c.setLineWidth(1.3)
             c.setFillColor(colors.white)
             c.rect(opt_x, y - 2, box, box, stroke=1, fill=1)
-            c.setFont(body, 11.5)
+            c.setFont(body, 13)
             c.setFillColor(DARK)
-            c.drawString(opt_x + box + 5, y, opt)
-            opt_w = pdfmetrics.stringWidth(opt, body, 11.5) + box + 18
+            c.drawString(opt_x + box + 6, y, opt)
+            opt_w = pdfmetrics.stringWidth(opt, body, 13) + box + 20
             opt_x += opt_w
-            if opt_x > PAGE_W - margin - 50 * mm:
+            if opt_x > PAGE_W - margin - 55 * mm:
                 opt_x = margin + 8
-                y -= 18
-        y -= 24
+                y -= 22
+        y -= 30
 
-    c.setFont(body, 13)
+    c.setFont(body, 15)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　自由記入欄・ご質問欄")
-    y -= 8
+    y -= 10
 
-    free_h = 95
+    free_h = 110
     c.setStrokeColor(DARK)
-    c.setLineWidth(1.0)
+    c.setLineWidth(1.1)
     c.setFillColor(colors.white)
     c.rect(margin, y - free_h, PAGE_W - 2 * margin, free_h, stroke=1, fill=1)
 
     c.setStrokeColor(LIGHT_GRAY)
     c.setDash(2, 3)
-    line_y = y - 18
-    while line_y > y - free_h + 8:
+    line_y = y - 22
+    while line_y > y - free_h + 10:
         c.line(margin + 4, line_y, PAGE_W - margin - 4, line_y)
-        line_y -= 16
+        line_y -= 20
     c.setDash()
 
-    c.setFont(body, 9)
+    c.setFont(body, 11)
     c.setFillColor(GRAY)
     c.drawCentredString(
         PAGE_W / 2,
