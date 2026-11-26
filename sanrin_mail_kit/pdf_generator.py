@@ -380,18 +380,17 @@ def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
     c.setFillColor(DARK)
     c.drawCentredString(PAGE_W / 2, y + 2, "山林引き取りご相談　郵送お手続きのご案内")
 
-    y -= 32
+    y -= 28
     intro = (
         "このたびは山林の引き取りについてお問い合わせいただき、誠にありがとうございます。"
-        "ご高齢のお客様やパソコン操作がご不安なお客様にも安心してご利用いただけるよう、"
-        "必要書類を郵送でお送りいただくためのキットをお届けしました。"
+        "パソコン操作がご不安な方も安心してご利用いただけるよう、郵送キットをお届けしました。"
         "下記をご確認のうえ、同封の返信用封筒でご返送ください。"
     )
     y = _draw_wrapped_text(
-        c, intro, margin, y, PAGE_W - 2 * margin, body, 12, leading=17
+        c, intro, margin, y, PAGE_W - 2 * margin, body, 11.5, leading=16
     )
 
-    y -= 28
+    y -= 22
     c.setFont(body, 14)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　ご返送いただきたいもの")
@@ -400,55 +399,89 @@ def _draw_cover_letter_common(c: canvas.Canvas, company: dict) -> None:
     c.setLineWidth(1.0)
     c.line(margin, y, PAGE_W - margin, y)
 
-    y -= 24
+    y -= 18
+    # 補足枠（素人向け）
+    tip = (
+        "【ひとこと】　「どの山林を引き取りたいか」が分かる書類のコピーが必要です。"
+        "市区町村から届く固定資産税の書類や、市役所・町村役場で取得できる証明書などです。"
+        "お手元の名前が違っても構いません。どれか1種類で大丈夫です。"
+    )
+    tip_h = 48
+    c.setFillColor(colors.Color(0.96, 0.98, 1.0))
+    c.setStrokeColor(DARK)
+    c.setLineWidth(0.8)
+    c.roundRect(margin, y - tip_h, PAGE_W - 2 * margin, tip_h, 2, stroke=1, fill=1)
+    _draw_wrapped_text(
+        c, tip, margin + 6, y - 12, PAGE_W - 2 * margin - 12, body, 10.5, leading=14
+    )
+    y -= tip_h + 16
+
     items = [
         (
-            "固定資産税の納税通知書・課税明細書のコピー",
-            "※ 原本ではなく必ずコピーをお送りください",
+            "①　山林の内容が分かる書類のコピー（どれか1つでOK）",
+            (
+                "例）固定資産税の納税通知書・課税明細書／名寄せ帳（固定資産課税台帳の写し）／"
+                "固定資産公課証明書／評価証明書 など。"
+                "所在地・地番・地目（山林・原野など）・面積が載っているページをコピーしてください。"
+                "※ 原本は送らず、必ずコピーをお送りください。"
+            ),
         ),
         (
-            "ご本人様確認書類のコピー（運転免許証の両面、またはマイナンバーカードの表面のみ）",
-            "※ マイナンバーカードの裏面は絶対にコピーしないでください",
+            "②　ご本人様確認書類のコピー",
+            (
+                "運転免許証の両面、またはマイナンバーカードの表面のみ。"
+                "※ マイナンバーカードの裏面は絶対にコピーしないでください。"
+            ),
         ),
         (
-            "同封の「山林引き取り　簡易ヒアリングシート」（ご記入のうえ）",
+            "③　同封の「山林引き取り　簡易ヒアリングシート」（ご記入のうえ）",
             None,
         ),
     ]
     content_w = PAGE_W - 2 * margin - 20
     for label, emphasis in items:
-        box = 15
+        box = 14
         c.setStrokeColor(DARK)
         c.setLineWidth(1.4)
         c.setFillColor(colors.white)
-        c.rect(margin, y - 3, box, box, stroke=1, fill=1)
+        c.rect(margin, y - 2, box, box, stroke=1, fill=1)
 
         text_x = margin + box + 8
         y = _draw_wrapped_text(
-            c, label, text_x, y + 2, content_w - box, body, 12, leading=16
+            c, label, text_x, y + 1, content_w - box, body, 11.5, leading=15
         )
         if emphasis:
-            y -= 15
-            y = _draw_emphasized(c, emphasis, text_x, y, content_w - box, font_size=11.5)
-        y -= 20
+            y -= 12
+            y = _draw_wrapped_text(
+                c,
+                emphasis,
+                text_x,
+                y,
+                content_w - box,
+                body,
+                10,
+                leading=13.5,
+                color=RED if "※" in emphasis else DARK,
+            )
+        y -= 14
 
-    y -= 8
-    c.setFont(body, 14)
+    y -= 6
+    c.setFont(body, 13)
     c.setFillColor(DARK)
     c.drawString(margin, y, "■　今後の流れ")
-    y -= 8
+    y -= 7
     c.setStrokeColor(DARK)
     c.setLineWidth(1.0)
     c.line(margin, y, PAGE_W - margin, y)
 
-    y -= 22
+    y -= 18
     flow = (
         "書類が弊社に到着してから、原則として1週間以内に、"
         "内容を確認のうえお見積り・今後のご案内をご連絡いたします。"
-        "ご不明な点がございましたら、お気軽にお電話ください。"
+        "どの書類を送ればよいか迷われた場合も、お気軽にお電話ください。"
     )
     _draw_wrapped_text(
-        c, flow, margin, y, PAGE_W - 2 * margin, body, 12, leading=17
+        c, flow, margin, y, PAGE_W - 2 * margin, body, 11.5, leading=16
     )
 
     c.setFont(body, 9)
@@ -492,9 +525,11 @@ def _draw_hearing_sheet_common(c: canvas.Canvas, company: dict) -> None:
     c.roundRect(margin, y - box_h, PAGE_W - 2 * margin, box_h, 2, stroke=1, fill=1)
 
     guide = (
-        "同封いただく『課税明細書』のコピーの中で、"
+        "同封いただく固定資産の書類（課税明細書・名寄せ帳・公課証明書など）のコピーの中で、"
         "引き取りをご希望される山林の行に【赤ペン等で丸（〇）】をつけてください。"
+        "所在地・地番・地目が分かる箇所に印をつけていただけると助かります。"
     )
+    box_h = 62
     _draw_wrapped_text(
         c,
         guide,
