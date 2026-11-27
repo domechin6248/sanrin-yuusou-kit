@@ -66,7 +66,7 @@ DEFAULT_COMPANY = {
     "department": "山林引き取り受付係",
     "postal_code": "895-0000",
     "address": "鹿児島県薩摩川内市〇〇町1-2-3",
-    "phone": "0996-00-0000",
+    "phone": "0120-896-669",
     "contact_person": "担当者名",
 }
 
